@@ -121,16 +121,17 @@ local IsUnder13 = function(Player)
 	end)
 
 	if (not Success or not Policy) then
-		return false
+		IsUnder13Cache[Player.UserId] = true
+		return true
 	end
 
-	local Under = false
-	if (Policy.AreAdsAllowed == false) then Under = true end
-	if (Policy.AllowedExternalLinkReferences and #Policy.AllowedExternalLinkReferences == 0) then Under = true end
-	if (Policy.IsPaidItemTradingAllowed == false) then Under = true end
+	local Over = false
+	if (Policy.AreAdsAllowed == true) then Over = true end
+	if (Policy.AllowedExternalLinkReferences and #Policy.AllowedExternalLinkReferences > 0) then Over = true end
+	if (Policy.IsPaidItemTradingAllowed == true) then Over = true end
 
-	IsUnder13Cache[Player.UserId] = Under
-	return Under
+	IsUnder13Cache[Player.UserId] = not Over
+	return not Over
 end
 
 -- might just remove this function
@@ -944,7 +945,9 @@ if (not Core2016) then
 		local UpdateIconPos = function()
 			local LastIcon = FindRightmost();
 			if (LastIcon) then
-				GameIconHolder.Position = UDim2.fromOffset(LastIcon.AbsolutePosition.X + LastIcon.AbsoluteSize.X + 12, -6);
+				local X = LastIcon.AbsolutePosition.X + LastIcon.AbsoluteSize.X
+				local Y = LastIcon.AbsolutePosition.Y - TopbarBackground.AbsolutePosition.Y
+				GameIconHolder.Position = UDim2.fromOffset(X, Y);
 			end
 		end
 
