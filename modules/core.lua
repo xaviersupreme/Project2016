@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService");
 local StarterGui = game:GetService("StarterGui");
 local Players = game:GetService("Players");
 local Teams = game:GetService("Teams");
+local PolicyService = game:GetService("PolicyService");
 
 -- Variables
 local RobloxGui = CoreGui:WaitForChild("RobloxGui");
@@ -107,6 +108,29 @@ local GetPlayerColor = function(PlayerName)
 
 	local Color = ChatColors[((Value + ColorOffset) % #ChatColors) + 1]
 	return Format("#%02x%02x%02x", Floor(Color.R * 255), Floor(Color.G * 255), Floor(Color.B * 255));
+end
+
+local IsUnder13Cache = ({})
+local IsUnder13 = function(Player)
+	if (IsUnder13Cache[Player.UserId] ~= nil) then
+		return IsUnder13Cache[Player.UserId]
+	end
+
+	local Success, Policy = pcall(function()
+		return PolicyService:GetPolicyInfoForPlayerAsync(Player)
+	end)
+
+	if (not Success or not Policy) then
+		return false
+	end
+
+	local Under = false
+	if (Policy.AreAdsAllowed == false) then Under = true end
+	if (Policy.AllowedExternalLinkReferences and #Policy.AllowedExternalLinkReferences == 0) then Under = true end
+	if (Policy.IsPaidItemTradingAllowed == false) then Under = true end
+
+	IsUnder13Cache[Player.UserId] = Under
+	return Under
 end
 
 -- might just remove this function
@@ -338,10 +362,10 @@ local SetupChat = function()
 				local Player = UserId and Players:GetPlayerByUserId(UserId);
 
 				if (UserId and Player) then
-					local AgeGroupDifference = Find(BodyText.Text, "🔒 :");
+					local AgeGroupDifference = IsUnder13(Player) ~= IsUnder13(LocalPlayer);
 					local TeamMessage = Find(PrefixText.Text, "%[Team%]");
 					local TeamPrefix = (TeamMessage and "[Team] " or "");
-					local ToReplace = ((AgeGroupDifference and "🔒 :") or `{Player.DisplayName}:`);
+					local ToReplace = `{Player.DisplayName}:`;
 
 					local Body = (`<font color="{GetPlayerColor(Player.Name)}"><b>{TeamPrefix}[{Player.Name}]:</b></font> {Match(BodyText.Text, "</stroke></font>%s*(.*)$") or Match(BodyText.Text, ToReplace .. "%s*(.*)$") or ""}`);
 					local Prefix = (`<font color="{GetPlayerColor(Player.Name)}"><b>{TeamPrefix}[{Player.Name}]:</b></font>`);
@@ -421,12 +445,12 @@ local MirrorGameIcon = function(Source, ImageId, LabelText, ClickTarget, Visibil
 	local HasText = LabelText and LabelText ~= ""
 	if (not HasImage and not HasText) then return end
 
-	local ButtonWidth = (HasText and HasImage) and 72 or (HasText and not HasImage) and 72 or 32
+	local ButtonWidth = (HasText and HasImage) and 72 or (HasText and not HasImage) and 72 or 44
 
 	local Mirror = Create("ImageButton", {
 		Parent = GameIconHolder,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, ButtonWidth, 0, 32),
+		Size = UDim2.new(0, ButtonWidth, 0, 44),
 		Name = "GameIcon_Mirror",
 		AutoButtonColor = false,
 	})
@@ -888,7 +912,7 @@ if (not Core2016) then
 		Parent = GameIconHolder,
 		FillDirection = Enum.FillDirection.Horizontal,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 4),
+		Padding = UDim.new(0, 0),
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 	})
 
@@ -1593,16 +1617,26 @@ if (Configuration.FPSCounter and TopbarBackground) then
 		FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 	})
 
-	local FPS, LastTick = 0, tick()
-	Connect(RunService.RenderStepped, function()
-		local Elapsed = tick() - LastTick
-		LastTick = tick()
-		FPS = Floor(1 / Elapsed)
+	local FrameTimes = {}
+	local FrameIndex = 0
+	local FrameCount = 30
+	local FPS = 0
+
+	for i = 1, FrameCount do FrameTimes[i] = 0 end
+
+	Connect(RunService.RenderStepped, function(DeltaTime)
+		FrameIndex = (FrameIndex % FrameCount) + 1
+		FrameTimes[FrameIndex] = DeltaTime
 	end)
 
 	Spawn(function()
 		while true do
-			Wait(0.25);
+			Wait(0.5);
+			local Total = 0
+			for i = 1, FrameCount do Total += FrameTimes[i] end
+			if (Total > 0) then
+				FPS = Floor(FrameCount / Total)
+			end
 			FPSLabel.Text = Format("FPS: %d", FPS);
 		end
 	end)
