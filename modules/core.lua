@@ -362,10 +362,10 @@ local SetupChat = function()
 				local Player = UserId and Players:GetPlayerByUserId(UserId);
 
 				if (UserId and Player) then
-					local AgeGroupDifference = IsUnder13(Player) ~= IsUnder13(LocalPlayer);
+					local AgeGroupDifference = Find(BodyText.Text, "🔒 :");
 					local TeamMessage = Find(PrefixText.Text, "%[Team%]");
 					local TeamPrefix = (TeamMessage and "[Team] " or "");
-					local ToReplace = `{Player.DisplayName}:`;
+					local ToReplace = ((AgeGroupDifference and "🔒 :") or `{Player.DisplayName}:`);
 
 					local Body = (`<font color="{GetPlayerColor(Player.Name)}"><b>{TeamPrefix}[{Player.Name}]:</b></font> {Match(BodyText.Text, "</stroke></font>%s*(.*)$") or Match(BodyText.Text, ToReplace .. "%s*(.*)$") or ""}`);
 					local Prefix = (`<font color="{GetPlayerColor(Player.Name)}"><b>{TeamPrefix}[{Player.Name}]:</b></font>`);
@@ -760,7 +760,7 @@ local AccountContainer = function(Parent)
 		FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 	})
 
-	Create("TextLabel", {
+	local AccountAgeLabel = Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 7, 0, 13),
 		Size = UDim2.new(0, 156, 0, 12),
@@ -768,9 +768,14 @@ local AccountContainer = function(Parent)
 		TextSize = 11,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Text = "Account: <13",
+		Text = "Account: ...",
 		FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 	})
+
+	Spawn(function()
+		local Under = IsUnder13(LocalPlayer);
+		AccountAgeLabel.Text = Under and "Account: <13" or "Account: 13+"
+	end)
 
 	local StatHeaderLabels = {}
 	local StatValueLabels = {}
@@ -904,8 +909,9 @@ if (not Core2016) then
 		Parent = TopbarBackground,
 		Name = "GameIcons",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 160, 0, 0),
-		Size = UDim2.new(0, 400, 1, 0),
+		Position = UDim2.new(0, 160, 0, -6),
+		Size = UDim2.new(0, 400, 0, 44),
+		ClipsDescendants = false,
 	})
 
 	Create("UIListLayout", {
@@ -938,7 +944,7 @@ if (not Core2016) then
 		local UpdateIconPos = function()
 			local LastIcon = FindRightmost();
 			if (LastIcon) then
-				GameIconHolder.Position = UDim2.fromOffset(LastIcon.AbsolutePosition.X + LastIcon.AbsoluteSize.X + 12, 0);
+				GameIconHolder.Position = UDim2.fromOffset(LastIcon.AbsolutePosition.X + LastIcon.AbsoluteSize.X + 12, -6);
 			end
 		end
 
