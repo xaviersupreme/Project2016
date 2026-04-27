@@ -28,7 +28,7 @@ if (not game:IsLoaded()) then
 	game.Loaded:Wait();
 end
 
-getgenv().Config2016 = ({
+getgenv().Config2016 = getgenv().Config2016 or ({
     OldConsole = true,
     OldGraphics = true,
     OldPlayerList = true,
@@ -36,6 +36,7 @@ getgenv().Config2016 = ({
 
     ReplaceAgeGroupMessage = true,
     HideVoiceChatButton = false,
+    HideGameIcons = false,
 
     FPSCounter = false,
     OldStudTextures = false,
