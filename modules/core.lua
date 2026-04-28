@@ -203,13 +203,6 @@ local GetImage = function(Type: "Backpack" | "Chat" | "Menu", Visible)
 end
 
 local LoadProjectModule = function(ModuleName)
-	local LocalRoot = (getgenv().Project2016LocalRoot or "C:\\Users\\cobalt\\Documents\\2016CoreGUI\\");
-	local LocalPath = LocalRoot .. "modules\\" .. ModuleName .. ".lua";
-
-	if (readfile and isfile and isfile(LocalPath)) then
-		return loadstring(readfile(LocalPath))();
-	end
-
 	return loadstring(game:HttpGet(Repo .. "modules/" .. ModuleName .. ".lua"))();
 end
 
@@ -1107,6 +1100,9 @@ if (Configuration.OldPlayerList) then
 	local LeaderstatColumns = ({});
 	local PlayerUpdateFunctions = ({});
 	local TotalWidth = 170
+	local ControlWidth = 157
+	local ActivePlayerObject = nil
+	local ActivePlayerControls = nil
 
 	local GetSize = function(X: number)
 		local Viewport = workspace.CurrentCamera.ViewportSize
@@ -1130,6 +1126,10 @@ if (Configuration.OldPlayerList) then
 		Parent = TopbarBackground,
 		Size = GetSize(170),
 	})
+
+	local SetPlayerListWidth = function(Width)
+		PlayerListContainer.Size = GetSize(Width);
+	end
 
 	local ScrollList = Create("ScrollingFrame", {
 		Name = "ScrollList",
@@ -1166,7 +1166,7 @@ if (Configuration.OldPlayerList) then
 		end
 
 		TotalWidth = 170 + (#LeaderstatColumns * 60);
-		PlayerListContainer.Size = GetSize(TotalWidth);
+		SetPlayerListWidth(TotalWidth);
 
 		for _, Data in next, TeamFrames do
 			local HeaderIgnorePaddingFrame = Data.Header:FindFirstChild("HeaderIgnorePaddingFrame");
@@ -1334,9 +1334,86 @@ if (Configuration.OldPlayerList) then
 	end
 
 	local AddPlayer = function(Player)
-		local Open = false
 		local CurrentTeamKey = nil
 		local PlayerObject
+
+		local CloseControls = function()
+			if (ActivePlayerControls) then
+				Destroy(ActivePlayerControls);
+				ActivePlayerControls = nil
+			end
+
+			if (ActivePlayerObject) then
+				ActivePlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
+				ActivePlayerObject = nil
+			end
+
+			SetPlayerListWidth(TotalWidth);
+		end
+
+		local FocusPlayer = function(Button)
+			pcall(function()
+				local Character = Player.Character
+				local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid");
+				local Camera = workspace.CurrentCamera
+
+				if (Humanoid and Camera) then
+					Camera.CameraSubject = Humanoid
+				end
+			end)
+
+			if (Button) then
+				Button.Text = "Following"
+			end
+		end
+
+		local CreateControlButton = function(Parent, Text, Icon, LayoutOrder, Clicked)
+			local Button = Create("TextButton", {
+				Parent = Parent,
+				BackgroundColor3 = Color3.fromRGB(31, 31, 31),
+				BackgroundTransparency = 0.500,
+				BorderSizePixel = 0,
+				Size = UDim2.new(0, ControlWidth, 0, 24),
+				AutoButtonColor = true,
+				TextSize = 14,
+				Font = Enum.Font.SourceSans,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Text = Text,
+				LayoutOrder = LayoutOrder,
+			})
+
+			Create("UIPadding", {
+				Parent = Button,
+				PaddingLeft = UDim.new(0, 34),
+			})
+
+			if (Icon) then
+				Create("ImageLabel", {
+					Parent = Button,
+					BackgroundTransparency = 1,
+					Image = Icon,
+					Size = UDim2.new(0, 16, 0, 16),
+					Position = UDim2.new(0, 8, 0.5, -8),
+				})
+			end
+
+			Connect(Button.MouseEnter, function()
+				Button.BackgroundColor3 = Color3.fromRGB(70, 70, 70);
+			end)
+
+			Connect(Button.MouseLeave, function()
+				Button.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
+			end)
+
+			if (Clicked) then
+				Connect(Button.MouseButton1Click, function()
+					Clicked(Button);
+				end)
+			end
+
+			return Button
+		end
 
 		local UpdatePlayerTeam = function()
 			local TeamKey = (Player.Team or "Neutral");
@@ -1354,6 +1431,7 @@ if (Configuration.OldPlayerList) then
 
 			local TeamData = CreateTeamFrame(TeamKey)
 			PlayerObject.Parent = TeamData.Container
+			UpdatePlayerOrder(Player);
 
 			if (TeamData and TeamData.UpdateTeamStats) then
 				TeamData.UpdateTeamStats();
@@ -1477,57 +1555,32 @@ if (Configuration.OldPlayerList) then
 		end)
 
 		Connect(Changed(Player, "Team"), UpdatePlayerTeam);
+
+		Connect(PlayerObject.MouseEnter, function()
+			if (PlayerObject ~= ActivePlayerObject) then
+				PlayerObject.BackgroundColor3 = Color3.fromRGB(55, 55, 55);
+			end
+		end)
+
+		Connect(PlayerObject.MouseLeave, function()
+			if (PlayerObject ~= ActivePlayerObject) then
+				PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
+			end
+		end)
+
 		Connect(PlayerObject.MouseButton1Click, function()
-			if (not Open) then
-				local Descendants = ScrollList:GetDescendants();
+			local WasOpen = (ActivePlayerObject == PlayerObject)
 
-				for _, User in next, Descendants do
-					if (User.Name == "PlayerControlsHolder") then
-						Destroy(User);
-					end
-				end
-
-				for _, User in next, Descendants do
-					if (User:IsA("TextButton") and User.Name ~= "TeamHeader") then
-						User.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-					end
-				end
+			if (not WasOpen) then
+				CloseControls();
 
 				local PlayerControlsHolder = Create("Frame", {
 					Parent = PlayerObject,
 					Name = "PlayerControlsHolder",
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 1, 0),
-					Position = UDim2.new(-1, -25, 0, 0),
+					Position = UDim2.new(0, -ControlWidth - 2, 0, 0),
 					Visible = true,
-				})
-
-				local FriendButton = Create("TextButton", {
-					Parent = PlayerControlsHolder,
-					BackgroundColor3 = Color3.fromRGB(31, 31, 31),
-					BackgroundTransparency = 0.500,
-					BorderSizePixel = 0,
-					Size = UDim2.new(0, 157, 0, 24),
-					AutoButtonColor = true,
-					TextSize = 14,
-					Font = Enum.Font.SourceSans,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					Text = "Send a friend request",
-				})
-
-				local ReportButton = Create("TextButton", {
-					Parent = PlayerControlsHolder,
-					BackgroundColor3 = Color3.fromRGB(31, 31, 31),
-					BackgroundTransparency = 0.500,
-					BorderSizePixel = 0,
-					Size = UDim2.new(0, 157, 0, 24),
-					AutoButtonColor = true,
-					TextSize = 14,
-					Font = Enum.Font.SourceSans,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					Text = "Report abuse",
 				})
 
 				Create("UIListLayout", {
@@ -1538,39 +1591,32 @@ if (Configuration.OldPlayerList) then
 					Padding = UDim.new(0, 2),
 				})
 
-				Create("UIPadding", {
-					Parent = FriendButton,
-					PaddingLeft = UDim.new(0, 36),
-				})
-
-				Create("UIPadding", {
-					Parent = ReportButton,
-					PaddingLeft = UDim.new(0, 36),
-				})
-
-				PlayerObject.BackgroundColor3 = Color3.fromRGB(0, 255, 255)                
-				Connect(FriendButton.MouseButton1Click, function()
-					local PlayerControlsHolder = PlayerObject:FindFirstChild("PlayerControlsHolder");
+				local FriendClicked = function(Button)
 					LocalPlayer:RequestFriendship(Player);
-
-					if (PlayerControlsHolder) then
-						Destroy(PlayerControlsHolder);
-						PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-					end
-
-					Open = false
-				end)
-			else
-				local PlayerControlsHolder = PlayerObject:FindFirstChild("PlayerControlsHolder");
-				PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-
-				if (PlayerControlsHolder) then
-					Destroy(PlayerControlsHolder);
+					Button.Text = "Request sent"
 				end
+
+				local ReportClicked = function()
+					local Env = getgenv();
+
+					if (Env.Settings2016 and Env.Settings2016.ReportPlayer) then
+						Env.Settings2016.ReportPlayer(Env.Settings2016, Player);
+					end
+				end
+
+				CreateControlButton(PlayerControlsHolder, "View", "rbxasset://textures/ui/Settings/MenuBarIcons/PlayersTabIcon.png", 1, FocusPlayer);
+				CreateControlButton(PlayerControlsHolder, "Follow", "rbxasset://textures/ui/Settings/MenuBarIcons/PlayersTabIcon.png", 2, FocusPlayer);
+				CreateControlButton(PlayerControlsHolder, "Add Friend", "rbxasset://textures/ui/icon_friends_16.png", 3, FriendClicked);
+				CreateControlButton(PlayerControlsHolder, "Report abuse", "rbxasset://textures/ui/Settings/MenuBarIcons/ReportAbuseTab.png", 4, ReportClicked);
+
+				ActivePlayerObject = PlayerObject
+				ActivePlayerControls = PlayerControlsHolder
+				PlayerObject.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+			else
+				CloseControls();
 			end
 
-			Open = (not Open);
-			PlayerListContainer.Size = GetSize((Open and (TotalWidth + 157)) or TotalWidth);
+			SetPlayerListWidth((not WasOpen and (TotalWidth + ControlWidth)) or TotalWidth);
 		end)
 
 		Defer(function()
@@ -1602,6 +1648,12 @@ if (Configuration.OldPlayerList) then
 
 	Connect(Players.PlayerRemoving, function(Player)
 		PlayerUpdateFunctions[Player] = nil
+
+		if (ActivePlayerObject and ActivePlayerObject.Name == Player.Name) then
+			ActivePlayerObject = nil
+			ActivePlayerControls = nil
+			SetPlayerListWidth(TotalWidth);
+		end
 
 		for _, Data in next, TeamFrames do
 			for _, User in next, Data.Container:GetChildren() do

@@ -3,7 +3,6 @@ local ContextActionService = game:GetService("ContextActionService");
 local UserInputService = game:GetService("UserInputService");
 local StarterGui = game:GetService("StarterGui");
 local SoundService = game:GetService("SoundService");
-local TweenService = game:GetService("TweenService");
 local Players = game:GetService("Players");
 
 local LocalPlayer = Players.LocalPlayer
@@ -26,7 +25,7 @@ local BUTTON_SELECTED_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/Men
 local TAB_BAR_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuBackground.png";
 local TAB_SELECTION_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuSelection.png";
 local DROP_DOWN_IMAGE = "rbxasset://textures/ui/Settings/DropDown/DropDown.png";
-local PLAYER_LIST_OFFSET = 20
+local PLAYER_LIST_OFFSET = 0
 
 if (getgenv().Settings2016Data) then
 	for _, Connection in next, (getgenv().Settings2016Data.Connections or {}) do
@@ -80,10 +79,78 @@ local Protect = function(Callback)
 	return Success
 end
 
-local Tween = function(Object, Properties, Time)
-	local TweenObject = TweenService:Create(Object, TweenInfo.new(Time or 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), Properties);
-	TweenObject:Play();
-	return TweenObject
+local FadeText = function(Label, Transparency)
+	Spawn(function()
+		local Start = Label.TextTransparency
+
+		for Index = 1, 6 do
+			if (not Label.Parent) then
+				return
+			end
+
+			Label.TextTransparency = Start + ((Transparency - Start) * (Index / 6));
+			Wait();
+		end
+	end)
+end
+
+local LerpUDim = function(Start, Goal, Alpha)
+	return UDim.new(Start.Scale + ((Goal.Scale - Start.Scale) * Alpha), Start.Offset + ((Goal.Offset - Start.Offset) * Alpha));
+end
+
+local LerpUDim2 = function(Start, Goal, Alpha)
+	return UDim2.new(LerpUDim(Start.X, Goal.X, Alpha), LerpUDim(Start.Y, Goal.Y, Alpha));
+end
+
+local LerpColor = function(Start, Goal, Alpha)
+	return Color3.new(Start.R + ((Goal.R - Start.R) * Alpha), Start.G + ((Goal.G - Start.G) * Alpha), Start.B + ((Goal.B - Start.B) * Alpha));
+end
+
+local MoveTweens = ({})
+local MoveTo = function(Object, Position, Callback, Frames)
+	MoveTweens[Object] = (MoveTweens[Object] or 0) + 1
+	local Id = MoveTweens[Object]
+
+	Spawn(function()
+		local Start = Object.Position
+		Frames = Frames or 8
+
+		for Index = 1, Frames do
+			if (not Object.Parent or MoveTweens[Object] ~= Id) then
+				return
+			end
+
+			local Alpha = Index / Frames
+			Alpha = 1 - ((1 - Alpha) * (1 - Alpha));
+			Object.Position = LerpUDim2(Start, Position, Alpha);
+			Wait();
+		end
+
+		Object.Position = Position
+
+		if (Callback and MoveTweens[Object] == Id) then
+			Callback();
+		end
+	end)
+end
+
+local ColorTweens = ({})
+local ColorTo = function(Object, Color)
+	ColorTweens[Object] = (ColorTweens[Object] or 0) + 1
+	local Id = ColorTweens[Object]
+
+	Spawn(function()
+		local Start = Object.BackgroundColor3
+
+		for Index = 1, 5 do
+			if (not Object.Parent or ColorTweens[Object] ~= Id) then
+				return
+			end
+
+			Object.BackgroundColor3 = LerpColor(Start, Color, Index / 5);
+			Wait();
+		end
+	end)
 end
 
 local SetMouseSensitivity = function(Value)
@@ -132,6 +199,7 @@ local MakeText = function(Parent, Text, Size, Position)
 	})
 end
 
+local ButtonHome = ({})
 local MakeStyledButton = function(Name, Text, Size, Clicked)
 	local Button = Create("ImageButton", {
 		Name = Name,
@@ -158,13 +226,22 @@ local MakeStyledButton = function(Name, Text, Size, Clicked)
 		TextWrapped = true,
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
+	ButtonHome[Label] = Label.Position
 
 	Connect(Button.MouseEnter, function()
 		Button.Image = BUTTON_SELECTED_IMAGE;
+		local Position = ButtonHome[Label] or Label.Position
+		MoveTo(Label, UDim2.new(Position.X.Scale, Position.X.Offset, Position.Y.Scale, Position.Y.Offset - 2));
 	end)
 
 	Connect(Button.MouseLeave, function()
 		Button.Image = BUTTON_IMAGE;
+		MoveTo(Label, ButtonHome[Label] or UDim2.new(0, 0, 0, 0));
+	end)
+
+	Connect(Button.MouseButton1Down, function()
+		local Position = ButtonHome[Label] or Label.Position
+		MoveTo(Label, UDim2.new(Position.X.Scale, Position.X.Offset, Position.Y.Scale, Position.Y.Offset + 2));
 	end)
 
 	if (Clicked) then
@@ -296,13 +373,14 @@ local ResizeHub = function()
 
 	local Width = Clamp(Viewport.X - 20, 520, 800);
 	local Height = Clamp(Viewport.Y - 190, 220, 600);
+	local HubTop = Clamp((Viewport.Y - (Height + 130)) / 2, 10, 80);
 
 	Hub.HubBar.Size = UDim2.new(0, Width, 0, 60);
-	Hub.HubBar.Position = UDim2.new(0.5, -Width / 2, 0.1, 0);
+	Hub.HubBar.Position = UDim2.new(0.5, -Width / 2, 0, HubTop);
 	Hub.PageClipper.Size = UDim2.new(0, Width, 0, Height);
-	Hub.PageClipper.Position = UDim2.new(0.5, -Width / 2, 0.5, -Height / 2);
+	Hub.PageClipper.Position = UDim2.new(0.5, -Width / 2, 0, HubTop + 60);
 	Hub.BottomButtonFrame.Size = UDim2.new(0, Width, 0, 60);
-	Hub.BottomButtonFrame.Position = UDim2.new(0.5, -Width / 2, 0.5, Height / 2);
+	Hub.BottomButtonFrame.Position = UDim2.new(0.5, -Width / 2, 0, HubTop + Height + 70);
 end
 
 ResizeHub();
@@ -421,9 +499,14 @@ SwitchToPage = function(Page, NoStack)
 		end
 
 		if (Other.Selection) then
+			local Title = Other.Icon and Other.Icon:FindFirstChild("Title");
+
 			Other.Selection.Visible = false
 			Other.Icon.ImageTransparency = 0.5
-			Other.Icon.Title.TextTransparency = 0.5
+
+			if (Title) then
+				Title.TextTransparency = 0.5
+			end
 		end
 	end
 
@@ -431,10 +514,11 @@ SwitchToPage = function(Page, NoStack)
 	Page.Frame.Visible = true
 
 	if (OldFrame and OldFrame ~= Page.Frame and OldFrame.Parent == Hub.PageView and OldFrame.Visible) then
-		Page.Frame.Position = UDim2.new(0, Direction * 60, 0, 0);
-		Page.Frame:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.14, true);
-		OldFrame:TweenPosition(UDim2.new(0, -Direction * 60, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.14, true);
-		task.delay(0.15, function()
+		local PageWidth = math.max(Hub.PageClipper.AbsoluteSize.X, 800);
+		Page.Frame.Position = UDim2.new(0, Direction * PageWidth, 0, 0);
+		MoveTo(Page.Frame, UDim2.new(0, 0, 0, 0), nil, 12);
+		MoveTo(OldFrame, UDim2.new(0, -Direction * PageWidth, 0, 0), nil, 12);
+		task.delay(0.22, function()
 			if (Hub.CurrentPage ~= OldPage and OldFrame) then
 				OldFrame.Visible = false
 			end
@@ -448,9 +532,14 @@ SwitchToPage = function(Page, NoStack)
 	Hub.CurrentPage = Page
 
 	if (Page.Selection) then
+		local Title = Page.Icon and Page.Icon:FindFirstChild("Title");
+
 		Page.Selection.Visible = true
 		Page.Icon.ImageTransparency = 0
-		Page.Icon.Title.TextTransparency = 0
+
+		if (Title) then
+			Title.TextTransparency = 0
+		end
 	end
 
 	if (not NoStack and Hub.MenuStack[#Hub.MenuStack] ~= Page) then
@@ -511,17 +600,12 @@ local MakePlayerRow = function(Page, Player, Index)
 		ZIndex = SETTINGS_BASE_ZINDEX + 2,
 	})
 
-	Row.Position = UDim2.new(0, -24, 0, PLAYER_LIST_OFFSET + ((Index - 1) * 80));
-	Row:TweenPosition(UDim2.new(0, 0, 0, PLAYER_LIST_OFFSET + ((Index - 1) * 80)), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.16, true);
-
 	Connect(Row.MouseEnter, function()
-		Row:TweenPosition(UDim2.new(0, 8, 0, PLAYER_LIST_OFFSET + ((Index - 1) * 80)), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.12, true);
-		Tween(Row, ({ ImageTransparency = 0.65 }), 0.12);
+		Row.ImageTransparency = 0.65
 	end)
 
 	Connect(Row.MouseLeave, function()
-		Row:TweenPosition(UDim2.new(0, 0, 0, PLAYER_LIST_OFFSET + ((Index - 1) * 80)), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.12, true);
-		Tween(Row, ({ ImageTransparency = 0.85 }), 0.12);
+		Row.ImageTransparency = 0.85
 	end)
 
 	Create("TextLabel", {
@@ -689,8 +773,8 @@ local MakeSelector = function(Page, Name, Values, Index, Changed)
 		Label.Text = Text
 		Label.Position = UDim2.new(0, 60 + ((Direction or 0) * 16), 0, 0);
 		Label.TextTransparency = 0.75
-		Label:TweenPosition(UDim2.new(0, 60, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.12, true);
-		Tween(Label, ({ TextTransparency = 0.2 }), 0.12);
+		MoveTo(Label, UDim2.new(0, 60, 0, 0));
+		FadeText(Label, 0.2);
 	end
 
 	local Apply = function(Delta)
@@ -784,9 +868,15 @@ local MakeSlider = function(Page, Name, Steps, Index, Changed, MinStep)
 	local Segments = ({})
 	local Dragging = false
 
-	local Refresh = function()
+	local Refresh = function(Immediate)
 		for Index2, Segment in next, Segments do
-			Segment.BackgroundColor3 = (Index2 <= CurrentIndex and Color3.fromRGB(0, 162, 255)) or Color3.fromRGB(78, 84, 96);
+			local Color = (Index2 <= CurrentIndex and Color3.fromRGB(0, 162, 255)) or Color3.fromRGB(78, 84, 96);
+
+			if (Immediate) then
+				Segment.BackgroundColor3 = Color
+			else
+				ColorTo(Segment, Color);
+			end
 		end
 	end
 
@@ -886,11 +976,11 @@ local MakeSlider = function(Page, Name, Steps, Index, Changed, MinStep)
 		SetSliderValue(CurrentIndex + 1);
 	end)
 
-	Refresh();
+	Refresh(true);
 	return ({
 		SetValue = function(_, NewValue)
 			CurrentIndex = Clamp(NewValue, MinStep, Steps);
-			Refresh();
+			Refresh(true);
 		end,
 		GetValue = function()
 			return CurrentIndex
@@ -1374,7 +1464,8 @@ HelpPage.Frame.Size = UDim2.new(1, 0, 0, MenuFrame.Position.Y.Offset + MenuFrame
 local ResetPage = MakePage("ResetCharacter");
 AddPage(ResetPage);
 MakeText(ResetPage.Frame, "Are you sure you want to reset your character?", UDim2.new(1, 0, 0, 200), UDim2.new(0, 0, 0, 0)).TextSize = 36
-local ResetButton = MakeStyledButton("ResetCharacter", "Reset", UDim2.new(0, 200, 0, 50), function()
+
+local ResetCharacter = function()
 	local Character = LocalPlayer.Character
 	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid");
 
@@ -1383,7 +1474,13 @@ local ResetButton = MakeStyledButton("ResetCharacter", "Reset", UDim2.new(0, 200
 	end
 
 	SetVisibility(false, true);
-end)
+end
+
+local LeaveGame = function()
+	game:Shutdown();
+end
+
+local ResetButton = MakeStyledButton("ResetCharacter", "Reset", UDim2.new(0, 200, 0, 50), ResetCharacter)
 ResetButton.Parent = ResetPage.Frame
 ResetButton.Position = UDim2.new(0.5, -220, 0, 170);
 local DontResetButton = MakeStyledButton("DontResetCharacter", "Don't Reset", UDim2.new(0, 200, 0, 50), function()
@@ -1396,9 +1493,7 @@ ResetPage.Frame.Size = UDim2.new(1, 0, 0, 240);
 local LeavePage = MakePage("LeaveGame");
 AddPage(LeavePage);
 MakeText(LeavePage.Frame, "Are you sure you want to leave the game?", UDim2.new(1, 0, 0, 200), UDim2.new(0, 0, 0, 0)).TextSize = 36
-local LeaveButton = MakeStyledButton("LeaveGame", "Leave", UDim2.new(0, 200, 0, 50), function()
-	game:Shutdown();
-end)
+local LeaveButton = MakeStyledButton("LeaveGame", "Leave", UDim2.new(0, 200, 0, 50), LeaveGame)
 LeaveButton.Parent = LeavePage.Frame
 LeaveButton.Position = UDim2.new(0.5, -220, 0, 170);
 local DontLeaveButton = MakeStyledButton("DontLeaveGame", "Don't Leave", UDim2.new(0, 200, 0, 50), function()
@@ -1432,6 +1527,7 @@ local MakeBottomButton = function(Name, Text, Icon, Position, Clicked)
 	if (Label) then
 		Label.Position = UDim2.new(0, 10, 0, 0);
 		Label.Size = UDim2.new(1, 0, 1, -2);
+		ButtonHome[Label] = Label.Position
 	end
 
 	return Button
@@ -1465,7 +1561,8 @@ SetVisibility = function(Visible, NoAnimation, CustomPage)
 		if (NoAnimation) then
 			Hub.Shield.Position = SETTINGS_ACTIVE_POSITION
 		else
-			Hub.Shield:TweenPosition(SETTINGS_ACTIVE_POSITION, Enum.EasingDirection.InOut, Enum.EasingStyle.Quart, 0.5, true);
+			Hub.Shield.Position = SETTINGS_INACTIVE_POSITION
+			MoveTo(Hub.Shield, SETTINGS_ACTIVE_POSITION, nil, 28);
 		end
 
 		SwitchToPage(CustomPage or PlayersPage, true);
@@ -1474,11 +1571,11 @@ SetVisibility = function(Visible, NoAnimation, CustomPage)
 			Hub.Shield.Position = SETTINGS_INACTIVE_POSITION
 			Hub.Shield.Visible = false
 		else
-			Hub.Shield:TweenPosition(SETTINGS_INACTIVE_POSITION, Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.4, true, function()
+			MoveTo(Hub.Shield, SETTINGS_INACTIVE_POSITION, function()
 				if (not Hub.Visible) then
 					Hub.Shield.Visible = false
 				end
-			end)
+			end, 22)
 		end
 	end
 end
@@ -1515,6 +1612,16 @@ Connect(UserInputService.InputBegan, function(Input, Processed)
 
 	if (Input.KeyCode == Enum.KeyCode.Escape) then
 		EscapeAction(nil, Enum.UserInputState.Begin);
+	elseif (Hub.Visible and Input.KeyCode == Enum.KeyCode.R and Hub.CurrentPage ~= ResetPage and Hub.CurrentPage ~= LeavePage) then
+		PushPage(ResetPage);
+	elseif (Hub.Visible and Input.KeyCode == Enum.KeyCode.L and Hub.CurrentPage ~= ResetPage and Hub.CurrentPage ~= LeavePage) then
+		PushPage(LeavePage);
+	elseif (Hub.Visible and (Input.KeyCode == Enum.KeyCode.Return or Input.KeyCode == Enum.KeyCode.KeypadEnter)) then
+		if (Hub.CurrentPage == ResetPage) then
+			ResetCharacter();
+		elseif (Hub.CurrentPage == LeavePage) then
+			LeaveGame();
+		end
 	end
 end)
 
