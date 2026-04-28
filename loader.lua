@@ -10,6 +10,7 @@ getgenv().Config2016 = getgenv().Config2016 or ({
     OldGraphics = true,
     OldPlayerList = true,
     OldBubbleChat = true,
+    OldEscapeMenu = true,
 
     ReplaceAgeGroupMessage = true,
     HideVoiceChatButton = false,
@@ -21,4 +22,11 @@ getgenv().Config2016 = getgenv().Config2016 or ({
 })
 
 local Repo = "https://raw.githubusercontent.com/xaviersupreme/Project2016/main/"
-loadstring(game:HttpGet(Repo .. "modules/core.lua"))();
+local LocalRoot = (getgenv().Project2016LocalRoot or "C:\\Users\\cobalt\\Documents\\2016CoreGUI\\");
+local LocalCore = LocalRoot .. "modules\\core.lua";
+
+if (readfile and isfile and isfile(LocalCore)) then
+	loadstring(readfile(LocalCore))();
+else
+	loadstring(game:HttpGet(Repo .. "modules/core.lua"))();
+end

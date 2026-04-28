@@ -34,6 +34,7 @@ local Configuration = ({
 	OldGraphics = true,
 	OldPlayerList = true,
 	OldBubbleChat = true,
+	OldEscapeMenu = true,
 
 	ReplaceAgeGroupMessage = true,
 	HideVoiceChatButton = false,
@@ -50,9 +51,34 @@ end
 
 getgenv().Config2016 = Configuration
 
-if (Core2016) then
-	return
+if (getgenv().Core2016Data) then
+	for _, Connection in next, (getgenv().Core2016Data.Connections or {}) do
+		pcall(function()
+			Connection:Disconnect();
+		end)
+	end
+
+	for _, Object in next, (getgenv().Core2016Data.Objects or {}) do
+		pcall(function()
+			Object:Destroy();
+		end)
+	end
 end
+
+for _, Object in next, CoreGui:GetChildren() do
+	if ((Object.Name == "Project2016RobloxGui") or (Object.Name == "Settings2016Gui") or (Object.Name == "Core2016SettingsGui")) then
+		pcall(function()
+			Object:Destroy();
+		end)
+	elseif (Object.Name == "RobloxGui" and Object:IsA("ScreenGui") and not Object:FindFirstChild("Modules")) then
+		pcall(function()
+			Object:Destroy();
+		end)
+	end
+end
+
+getgenv().Core2016 = nil
+Core2016 = nil
 
 -- Luau
 local Spawn, Wait, Defer = task.spawn, task.wait, task.defer
@@ -60,7 +86,18 @@ local Byte, Sub, Format, Match, Find, Replace = string.byte, string.sub, string.
 local Floor, Random, Clamp = math.floor, math.random, math.clamp
 local Discover, Insert = table.find, table.insert
 
-local Connect = (game.Loaded.Connect);
+local Core2016Data = ({
+	Connections = ({}),
+	Objects = ({}),
+})
+getgenv().Core2016Data = Core2016Data
+
+local RawConnect = (game.Loaded.Connect);
+local Connect = function(Signal, Callback)
+	local Connection = RawConnect(Signal, Callback);
+	Insert(Core2016Data.Connections, Connection);
+	return Connection
+end
 local Clone = (game.Clone);
 local Destroy = (game.Destroy);
 local Changed = (game.GetPropertyChangedSignal);
@@ -163,6 +200,17 @@ local GetImage = function(Type: "Backpack" | "Chat" | "Menu", Visible)
 	}
 
 	return Images[Type][tostring(Visible)]
+end
+
+local LoadProjectModule = function(ModuleName)
+	local LocalRoot = (getgenv().Project2016LocalRoot or "C:\\Users\\cobalt\\Documents\\2016CoreGUI\\");
+	local LocalPath = LocalRoot .. "modules\\" .. ModuleName .. ".lua";
+
+	if (readfile and isfile and isfile(LocalPath)) then
+		return loadstring(readfile(LocalPath))();
+	end
+
+	return loadstring(game:HttpGet(Repo .. "modules/" .. ModuleName .. ".lua"))();
 end
 
 local CreateBackpack = function()
@@ -348,10 +396,11 @@ local SetupChat = function()
 		end)
 
 		-- update the chat player format (Player1: Message -> [Player1]: Message)
-		local BottomLockedScrollView = ChatWindowMain:WaitForChild("scrollingView"):WaitForChild("bottomLockedScrollView");
-		local ScrollView = BottomLockedScrollView:WaitForChild("RCTScrollView");
-		local Chats = ScrollView:WaitForChild("RCTScrollContentView");
-		local Padding = BottomLockedScrollView:WaitForChild("padding", 1);
+		local ScrollingView = ChatWindowMain:WaitForChild("scrollingView", 2);
+		local BottomLockedScrollView = ScrollingView and ScrollingView:WaitForChild("bottomLockedScrollView", 2);
+		local ScrollView = BottomLockedScrollView and BottomLockedScrollView:WaitForChild("RCTScrollView", 2);
+		local Chats = ScrollView and ScrollView:WaitForChild("RCTScrollContentView", 2);
+		local Padding = BottomLockedScrollView and BottomLockedScrollView:WaitForChild("padding", 1);
 
 		local UpdateChatMessage = function(Message)
 			local TextMessage = Message and Message:FindFirstChild("TextMessage");
@@ -396,9 +445,11 @@ local SetupChat = function()
 			end
 		end
 
-		Connect(Chats.ChildAdded, UpdateChatMessage);
-		for _, ChatObject in next, Chats:GetChildren() do
-			UpdateChatMessage(ChatObject);
+		if (Chats) then
+			Connect(Chats.ChildAdded, UpdateChatMessage);
+			for _, ChatObject in next, Chats:GetChildren() do
+				UpdateChatMessage(ChatObject);
+			end
 		end
 
 		if (Padding) then
@@ -891,11 +942,12 @@ local TopbarBackground, AccountInfo
 
 if (not Core2016) then
 	local CustomScreenGui = Create("ScreenGui", {
-		Name = "RobloxGui",
+		Name = "Project2016RobloxGui",
 		Parent = CoreGui,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
 	})
+	Insert(Core2016Data.Objects, CustomScreenGui);
 
 	TopbarBackground = Create("Frame", {
 		Parent = CustomScreenGui,
@@ -999,11 +1051,22 @@ end
 if (Configuration.OldConsole) then
 	Spawn(function()
 		local Success, Error = pcall(function()
-			loadstring(game:HttpGet(Repo .. "modules/console.lua"))();
+			LoadProjectModule("console");
 		end)
 
 		if (not Success) then
 			warn("[Core2016] Failed to load OldConsole:", Error);
+		end
+	end)
+end
+
+if (Configuration.OldEscapeMenu) then
+	Spawn(function()
+		local Success, Error = pcall(function()
+			LoadProjectModule("settings");
+		end)
+		if (not Success) then
+			warn("[Core2016] Failed to load OldEscapeMenu:", Error);
 		end
 	end)
 end
