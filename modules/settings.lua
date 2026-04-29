@@ -1,7 +1,6 @@
 local CoreGui = game:GetService("CoreGui");
 local ContextActionService = game:GetService("ContextActionService");
 local UserInputService = game:GetService("UserInputService");
-local StarterGui = game:GetService("StarterGui");
 local SoundService = game:GetService("SoundService");
 local Players = game:GetService("Players");
 
@@ -18,14 +17,18 @@ local SETTINGS_SHIELD_TRANSPARENCY = 0.2
 local SETTINGS_BASE_ZINDEX = 200
 local SETTINGS_INACTIVE_POSITION = UDim2.new(0, 0, -1, -36);
 local SETTINGS_ACTIVE_POSITION = UDim2.new(0, 0, 0, 0);
-local ROW_CONTROL_X = 430
 
 local BUTTON_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButton.png";
 local BUTTON_SELECTED_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButtonSelected.png";
 local TAB_BAR_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuBackground.png";
 local TAB_SELECTION_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuSelection.png";
 local DROP_DOWN_IMAGE = "rbxasset://textures/ui/Settings/DropDown/DropDown.png";
-local PLAYER_LIST_OFFSET = 0
+local PLAYER_LIST_OFFSET = 20
+local DESCRIPTION_PLACEHOLDER = "Short Description (Optional)"
+
+local GetHeadshot = function(Player)
+	return "rbxthumb://type=AvatarHeadShot&id=" .. tostring(math.max(1, Player.UserId or Player.userId or 1)) .. "&w=48&h=48"
+end
 
 if (getgenv().Settings2016Data) then
 	for _, Connection in next, (getgenv().Settings2016Data.Connections or {}) do
@@ -71,10 +74,6 @@ end
 
 local Protect = function(Callback)
 	local Success, Error = pcall(Callback);
-
-	if (not Success) then
-		warn("[Settings2016]", Error);
-	end
 
 	return Success
 end
@@ -199,7 +198,6 @@ local MakeText = function(Parent, Text, Size, Position)
 	})
 end
 
-local ButtonHome = ({})
 local MakeStyledButton = function(Name, Text, Size, Clicked)
 	local Button = Create("ImageButton", {
 		Name = Name,
@@ -226,22 +224,13 @@ local MakeStyledButton = function(Name, Text, Size, Clicked)
 		TextWrapped = true,
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
-	ButtonHome[Label] = Label.Position
 
 	Connect(Button.MouseEnter, function()
 		Button.Image = BUTTON_SELECTED_IMAGE;
-		local Position = ButtonHome[Label] or Label.Position
-		MoveTo(Label, UDim2.new(Position.X.Scale, Position.X.Offset, Position.Y.Scale, Position.Y.Offset - 2));
 	end)
 
 	Connect(Button.MouseLeave, function()
 		Button.Image = BUTTON_IMAGE;
-		MoveTo(Label, ButtonHome[Label] or UDim2.new(0, 0, 0, 0));
-	end)
-
-	Connect(Button.MouseButton1Down, function()
-		local Position = ButtonHome[Label] or Label.Position
-		MoveTo(Label, UDim2.new(Position.X.Scale, Position.X.Offset, Position.Y.Scale, Position.Y.Offset + 2));
 	end)
 
 	if (Clicked) then
@@ -371,16 +360,21 @@ local ResizeHub = function()
 		Viewport = (Camera and Camera.ViewportSize) or Vector2.new(1280, 720);
 	end
 
-	local Width = Clamp(Viewport.X - 20, 520, 800);
-	local Height = Clamp(Viewport.Y - 190, 220, 600);
-	local HubTop = Clamp((Viewport.Y - (Height + 130)) / 2, 10, 80);
+	local Width = (Viewport.X < 820 and Clamp(Viewport.X - 10, 520, 800)) or 800
+	local BarHeight = 60
+	local LargestPageSize = 600
+	local MinimumPageSize = 150
+	local BufferSize = 0.05 * Viewport.Y
+	local ExtraSpace = (BufferSize * 2) + (BarHeight * 2)
+	local UsableScreenHeight = Viewport.Y - ExtraSpace
+	local Height = Clamp(UsableScreenHeight, MinimumPageSize, LargestPageSize)
 
-	Hub.HubBar.Size = UDim2.new(0, Width, 0, 60);
-	Hub.HubBar.Position = UDim2.new(0.5, -Width / 2, 0, HubTop);
+	Hub.HubBar.Size = UDim2.new(0, Width, 0, BarHeight);
+	Hub.HubBar.Position = UDim2.new(0.5, -Width / 2, 0.5, -Height / 2 - BarHeight);
 	Hub.PageClipper.Size = UDim2.new(0, Width, 0, Height);
-	Hub.PageClipper.Position = UDim2.new(0.5, -Width / 2, 0, HubTop + 60);
-	Hub.BottomButtonFrame.Size = UDim2.new(0, Width, 0, 60);
-	Hub.BottomButtonFrame.Position = UDim2.new(0.5, -Width / 2, 0, HubTop + Height + 70);
+	Hub.PageClipper.Position = UDim2.new(0.5, -Width / 2, 0.5, -Height / 2);
+	Hub.BottomButtonFrame.Size = UDim2.new(0, Width, 0, BarHeight);
+	Hub.BottomButtonFrame.Position = UDim2.new(0.5, -Width / 2, 0.5, Height / 2);
 end
 
 ResizeHub();
@@ -424,8 +418,8 @@ local MakeTab = function(Page, Title, Icon, Width)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTransparency = 0.5,
 		Text = Title,
-		Size = UDim2.new(2.2, 0, 1, 0),
-		Position = UDim2.new(1.1, 0, 0, 0),
+		Size = UDim2.new(1.05, 0, 1, 0),
+		Position = UDim2.new(1.2, 0, 0, 0),
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
 
@@ -563,7 +557,9 @@ local MakeRow = function(Page, Name)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = "",
+		Active = false,
 		AutoButtonColor = false,
+		Selectable = false,
 		Size = UDim2.new(1, 0, 0, 50),
 		ZIndex = SETTINGS_BASE_ZINDEX + 2,
 	})
@@ -577,7 +573,7 @@ local MakeRow = function(Page, Name)
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = Name,
-		Size = UDim2.new(0, 230, 1, 0),
+		Size = UDim2.new(0, 200, 1, 0),
 		Position = UDim2.new(0, 10, 0, 0),
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
@@ -609,6 +605,7 @@ local MakePlayerRow = function(Page, Player, Index)
 	end)
 
 	Create("TextLabel", {
+		Name = "NameLabel",
 		Parent = Row,
 		BackgroundTransparency = 1,
 		Font = Enum.Font.SourceSans,
@@ -616,87 +613,87 @@ local MakePlayerRow = function(Page, Player, Index)
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = Player.Name,
-		Size = UDim2.new(0, 260, 1, 0),
+		Size = UDim2.new(1, -260, 1, 0),
 		Position = UDim2.new(0, 60, 0, 0),
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
 
 	Create("ImageLabel", {
+		Name = "Icon",
 		Parent = Row,
 		BackgroundTransparency = 1,
-		Image = "http://www.roblox.com/Thumbs/Avatar.ashx?x=100&y=100&userId=" .. tostring(math.max(1, Player.UserId)),
+		Image = GetHeadshot(Player),
 		Size = UDim2.new(0, 36, 0, 36),
 		Position = UDim2.new(0, 12, 0.5, -18),
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
 
-	local FlagButton = MakeStyledButton(Player.Name .. "FlagButton", "", UDim2.new(0, 44, 0, 40), function()
-		if (getgenv().Settings2016 and getgenv().Settings2016.ReportPlayer) then
-			getgenv().Settings2016:ReportPlayer(Player);
-		end
-	end)
-	FlagButton.Parent = Row
-	FlagButton.Position = UDim2.new(1, -450, 0.5, -20);
-
-	Create("ImageLabel", {
-		Parent = FlagButton,
-		BackgroundTransparency = 1,
-		Image = "rbxasset://textures/ui/Settings/MenuBarIcons/ReportAbuseTab.png",
-		Size = UDim2.new(0, 26, 0, 32),
-		Position = UDim2.new(0.5, -13, 0.5, -16),
-		ZIndex = SETTINGS_BASE_ZINDEX + 4,
-	})
-
-	local ViewButton = MakeStyledButton(Player.Name .. "ViewButton", "View", UDim2.new(0, 104, 0, 40), function()
-		pcall(function()
-			local Character = Player.Character
-			local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid");
-			local Camera = workspace.CurrentCamera
-
-			if (Humanoid and Camera) then
-				Camera.CameraSubject = Humanoid
-			end
-		end)
-	end)
-	ViewButton.Parent = Row
-	ViewButton.Position = UDim2.new(1, -390, 0.5, -20);
-
-	local FollowButton, FollowLabel
-	FollowButton, FollowLabel = MakeStyledButton(Player.Name .. "FollowButton", "Follow", UDim2.new(0, 104, 0, 40), function()
-		pcall(function()
-			local Character = Player.Character
-			local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid");
-			local Camera = workspace.CurrentCamera
-
-			if (Humanoid and Camera) then
-				Camera.CameraSubject = Humanoid
-				FollowLabel.Text = "Following"
-			end
-		end)
-	end)
-	FollowButton.Parent = Row
-	FollowButton.Position = UDim2.new(1, -270, 0.5, -20);
-
-	local FriendText = "Add Friend"
+	local Status = nil
 	Protect(function()
-		local Status = LocalPlayer:GetFriendStatus(Player);
-
-		if (Status == Enum.FriendStatus.Friend) then
-			FriendText = "Friend"
-		elseif (Status == Enum.FriendStatus.FriendRequestSent) then
-			FriendText = "Request Sent"
+		if (Player ~= LocalPlayer and (Player.UserId or Player.userId) > 1 and (LocalPlayer.UserId or LocalPlayer.userId) > 1) then
+			Status = LocalPlayer:GetFriendStatus(Player)
 		end
 	end)
 
 	local FriendButton, FriendLabel
-	FriendButton, FriendLabel = MakeStyledButton(Player.Name .. "FriendButton", FriendText, UDim2.new(0, 156, 0, 40), function()
-		if (FriendLabel and FriendLabel.Text == "Add Friend") then
-			LocalPlayer:RequestFriendship(Player);
-			FriendLabel.Text = "Request Sent"
+	if (not Status) then
+		FriendButton = Create("TextButton", {
+			Text = "",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 182, 0, 46),
+			Position = UDim2.new(1, -198, 0, 7),
+			ZIndex = SETTINGS_BASE_ZINDEX + 3,
+			Parent = Row,
+		})
+	elseif (Status == Enum.FriendStatus.Friend) then
+		FriendButton = Create("TextButton", {
+			Text = "Friend",
+			BackgroundTransparency = 1,
+			Font = Enum.Font.SourceSans,
+			TextSize = 24,
+			TextColor3 = Color3.new(1, 1, 1),
+			Size = UDim2.new(0, 182, 0, 46),
+			Position = UDim2.new(1, -198, 0, 7),
+			ZIndex = SETTINGS_BASE_ZINDEX + 3,
+			Parent = Row,
+		})
+	elseif (Status == Enum.FriendStatus.FriendRequestSent) then
+		FriendButton = Create("TextButton", {
+			Text = "Request Sent",
+			BackgroundTransparency = 1,
+			Font = Enum.Font.SourceSans,
+			TextSize = 24,
+			TextColor3 = Color3.new(1, 1, 1),
+			Size = UDim2.new(0, 182, 0, 46),
+			Position = UDim2.new(1, -198, 0, 7),
+			ZIndex = SETTINGS_BASE_ZINDEX + 3,
+			Parent = Row,
+		})
+	else
+		FriendButton, FriendLabel = MakeStyledButton("FriendStatus", "Add Friend", UDim2.new(0, 182, 0, 46), function()
+			if (FriendLabel and FriendLabel.Text ~= "") then
+				FriendButton.ImageTransparency = 1
+				FriendLabel.Text = ""
+				LocalPlayer:RequestFriendship(Player)
+			end
+		end)
+		FriendButton.Parent = Row
+		FriendButton.Position = UDim2.new(1, -198, 0, 7)
+		if (FriendLabel) then
+			FriendLabel.ZIndex = SETTINGS_BASE_ZINDEX + 3
+			FriendLabel.Position = FriendLabel.Position + UDim2.new(0, 0, 0, 1)
 		end
-	end)
-	FriendButton.Parent = Row
-	FriendButton.Position = UDim2.new(1, -164, 0.5, -20);
+	end
+
+	if (FriendButton) then
+		FriendButton.Name = "FriendStatus"
+		Connect(FriendButton.MouseEnter, function()
+			Row.ImageTransparency = 0.65
+		end)
+		Connect(FriendButton.MouseLeave, function()
+			Row.ImageTransparency = 0.85
+		end)
+	end
 
 	return Row
 end
@@ -711,7 +708,7 @@ local MakeSelector = function(Page, Name, Values, Index, Changed)
 		Image = "",
 		AutoButtonColor = false,
 		Size = UDim2.new(0, 502, 0, 50),
-		Position = UDim2.new(0, 320, 0.5, -25),
+		Position = UDim2.new(1, -502, 0.5, -25),
 		ZIndex = SETTINGS_BASE_ZINDEX + 2,
 	})
 
@@ -810,6 +807,12 @@ local MakeSelector = function(Page, Name, Values, Index, Changed)
 			CurrentIndex = Clamp(NewIndex, 1, #Values);
 			SetText(Values[CurrentIndex], 0);
 		end,
+		SetPosition = function(_, Position)
+			SelectorFrame.Position = Position
+		end,
+		SetSize = function(_, Size)
+			SelectorFrame.Size = Size
+		end,
 		GetSelectedIndex = function()
 			return CurrentIndex
 		end,
@@ -824,7 +827,7 @@ local MakeSlider = function(Page, Name, Steps, Index, Changed, MinStep)
 		Parent = Row,
 		BackgroundTransparency = 1,
 		Size = UDim2.new(0, 502, 0, 50),
-		Position = UDim2.new(0, 320, 0.5, -25),
+		Position = UDim2.new(1, -502, 0.5, -25),
 		Active = true,
 		ZIndex = SETTINGS_BASE_ZINDEX + 2,
 	})
@@ -993,7 +996,7 @@ local MakeDropDown = function(Page, Name, Values, Index, Changed)
 	local Row = MakeRow(Page, Name);
 	local Button = MakeStyledButton(Name .. "DropDown", Values[CurrentIndex] or "Choose One", UDim2.new(0, 300, 0, 44));
 	Button.Parent = Row
-	Button.Position = UDim2.new(0, ROW_CONTROL_X, 0.5, -22);
+	Button.Position = UDim2.new(1, -350, 0.5, -22);
 
 	Create("ImageLabel", {
 		Parent = Button,
@@ -1023,8 +1026,8 @@ local MakeDropDown = function(Page, Name, Values, Index, Changed)
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = Rect.new(8, 6, 46, 44),
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 400, 0, math.min(#Values * 51 + 20, 420)),
-		Position = UDim2.new(0.5, -200, 0.5, -210),
+		Size = UDim2.new(0, 400, 0.9, 0),
+		Position = UDim2.new(0.5, -200, 0.05, 0),
 		ZIndex = SETTINGS_BASE_ZINDEX + 21,
 	})
 
@@ -1032,7 +1035,7 @@ local MakeDropDown = function(Page, Name, Values, Index, Changed)
 		Parent = Panel,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Size = UDim2.new(1, -20, 1, -20),
+		Size = UDim2.new(1, -20, 1, -25),
 		Position = UDim2.new(0, 10, 0, 10),
 		CanvasSize = UDim2.new(0, 0, 0, #Values * 51),
 		ScrollBarThickness = 6,
@@ -1127,10 +1130,8 @@ local RebuildPlayersPage = function()
 
 	local Count = 0
 	for _, Player in next, SortedPlayers do
-		if (Player ~= LocalPlayer) then
-			Count += 1
-			MakePlayerRow(PlayersPage, Player, Count);
-		end
+		Count += 1
+		MakePlayerRow(PlayersPage, Player, Count);
 	end
 
 	PlayersPage.Frame.Size = UDim2.new(1, 0, 0, PLAYER_LIST_OFFSET + (Count * 80));
@@ -1144,6 +1145,12 @@ end)
 
 Connect(Players.PlayerRemoving, function(Player)
 	task.defer(RebuildPlayersPage);
+end)
+
+Protect(function()
+	Connect(LocalPlayer.FriendStatusChanged, function()
+		RebuildPlayersPage();
+	end)
 end)
 
 local GamePage = MakePage("GameSettings");
@@ -1289,6 +1296,8 @@ local ReportPage = MakePage("ReportAbuse");
 AddPage(ReportPage, "Report", "rbxasset://textures/ui/Settings/MenuBarIcons/ReportAbuseTab.png", 150);
 
 local ReportMode = MakeSelector(ReportPage, "Game or Player?", ({ "Game", "Player" }), 1);
+ReportMode:SetSize(UDim2.new(0, 400, 0, 50));
+ReportMode:SetPosition(UDim2.new(1, -400, 0.5, -25));
 local PlayerNames = ({ "Choose One" })
 for _, Player in next, Players:GetPlayers() do
 	Insert(PlayerNames, Player.Name);
@@ -1335,16 +1344,25 @@ local Description = Create("TextBox", {
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextYAlignment = Enum.TextYAlignment.Top,
 	TextWrapped = true,
-	Text = "Short Description (Optional)",
+	Text = DESCRIPTION_PLACEHOLDER,
 	Size = UDim2.new(1, -20, 0, 100),
 	Position = UDim2.new(0, 10, 0, 0),
 	ZIndex = SETTINGS_BASE_ZINDEX + 3,
 })
+Connect(Description.Focused, function()
+	if (Description.Text == DESCRIPTION_PLACEHOLDER) then
+		Description.Text = ""
+	end
+end)
+Connect(Description.FocusLost, function()
+	if (Description.Text == "") then
+		Description.Text = DESCRIPTION_PLACEHOLDER
+	end
+end)
 DescriptionRow.Size = UDim2.new(1, 0, 0, 110);
 ReportPage.Frame.Size = UDim2.new(1, 0, 0, ReportPage.Frame.Size.Y.Offset + 60);
 
 local Submit = MakeStyledButton("SubmitButton", "Submit", UDim2.new(0, 198, 0, 50), function()
-	warn("[Settings2016] Report submitted locally. Roblox report backend is CoreScript-only in executor context.");
 	SetVisibility(false, true);
 end)
 Submit.Parent = ReportPage.Frame
@@ -1525,9 +1543,8 @@ local MakeBottomButton = function(Name, Text, Icon, Position, Clicked)
 
 	local Label = Button:FindFirstChild(Name .. "ButtonTextLabel");
 	if (Label) then
-		Label.Position = UDim2.new(0, 10, 0, 0);
-		Label.Size = UDim2.new(1, 0, 1, -2);
-		ButtonHome[Label] = Label.Position
+		Label.Position = UDim2.new(0, 10, 0, -4);
+		Label.Size = UDim2.new(1, 0, 1, 0);
 	end
 
 	return Button
