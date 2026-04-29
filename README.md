@@ -2,7 +2,9 @@
 
 A 2016 CoreGui remake for Roblox
 
-> Originally by **lxte**, modded by **xavier**. Inspired by spec / scot.wtf's Project2016.
+> Originally by **lxte**, modded by **me**. Inspired by spec / scot.wtf's Project2016.
+
+> there WILL be bugs.. 😈 (Make a PR if you find any bugs or want a feature)
 
 ## Features
 
@@ -11,11 +13,24 @@ A 2016 CoreGui remake for Roblox
 - **Old Graphics** -- Classic Enum.Technology.Compatibility lighting
 - **Old Bubble Chat** -- Classic bubble chat style (if u even have chat lolx)
 - **Old Player List** -- Old UI Player list
-- **Old escape menu**
+- **Old escape menu** -- Old escape menu
 - **Custom Topbar Icons** -- Game made topbar icons are automatically styled
 - **FPS Counter** -- Optional FPS display in the topbar
 - **Old Stud Textures** -- Old stud overlays on plastic parts
 - **Old Cursor** - Old arrow cursor
+
+## Pictures
+
+<p align="center">
+  <img src="./assets/PlrMenu.png" height="220"/>
+  <img src="./assets/Topbar1.png" height="220"/>
+  <img src="./assets/chat.png" height="220"/>
+  <img src="./assets/dev.png" height="220"/>
+  <img src="./assets/menusettinsg.png" height="220"/>
+  <img src="./assets/playerlist.png" height="220"/>
+  <img src="./assets/plrdropdown.png" height="220"/>
+  <img src="./assets/topbarcustom.png" height="220"/>
+</p>
 
 ## Configuration
 
