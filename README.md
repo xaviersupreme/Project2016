@@ -33,6 +33,7 @@ getgenv().Config2016 = getgenv().Config2016 or ({
     OldGraphics = true,
     OldPlayerList = true,
     OldBubbleChat = true,
+    OldEscapeMenu = true,
 
     ReplaceAgeGroupMessage = true,
     HideVoiceChatButton = false,
@@ -43,7 +44,8 @@ getgenv().Config2016 = getgenv().Config2016 or ({
     OldCursor = true,
 })
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/xaviersupreme/Project2016/main/modules/core.lua"))();
+local Repo = "https://raw.githubusercontent.com/xaviersupreme/Project2016/main/"
+loadstring(game:HttpGet(Repo .. "modules/core.lua"))();
 
 ```
 
