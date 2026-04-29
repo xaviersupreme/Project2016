@@ -2,6 +2,38 @@
 
 A 2016 CoreGui remake for Roblox
 
+
+<p align="left">
+
+  <a href="https://github.com/xaviersupreme/Project2016/graphs/contributors">
+    <img alt="Contributors" src="https://img.shields.io/github/contributors/xaviersupreme/Project2016" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016/issues">
+    <img alt="Issues" src="https://img.shields.io/github/issues/xaviersupreme/Project2016?color=0088ff" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016/pulls">
+    <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/xaviersupreme/Project2016?color=0088ff" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016/stargazers">
+    <img alt="Stars" src="https://img.shields.io/github/stars/xaviersupreme/Project2016?style=flat" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016/network/members">
+    <img alt="Forks" src="https://img.shields.io/github/forks/xaviersupreme/Project2016?style=flat" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016">
+    <img alt="Last Commit" src="https://img.shields.io/github/last-commit/xaviersupreme/Project2016" />
+  </a>
+
+  <a href="https://github.com/xaviersupreme/Project2016">
+    <img alt="Repo Size" src="https://img.shields.io/github/repo-size/xaviersupreme/Project2016" />
+  </a>
+</p>
+
 > Originally by **lxte**, modded by **me**. Inspired by spec / scot.wtf's Project2016.
 
 > there WILL be bugs.. 😈 (Make a PR if you find any bugs or want a feature)
