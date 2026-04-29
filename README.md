@@ -44,8 +44,7 @@ getgenv().Config2016 = getgenv().Config2016 or ({
     OldCursor = true,
 })
 
-local Repo = "https://raw.githubusercontent.com/xaviersupreme/Project2016/main/"
-loadstring(game:HttpGet(Repo .. "modules/core.lua"))();
+loadstring(game:HttpGet("https://raw.githubusercontent.com/xaviersupreme/Project2016/main/modules/core.lua"))();
 
 ```
 
