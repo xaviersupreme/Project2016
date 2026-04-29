@@ -57,5 +57,6 @@ Project2016/
 |-- modules/
 |   |-- core.lua        # Main CoreGui Modder
 |   |-- console.lua     # Old developer console
+|   |-- settings.lua    # Old escape menu
 |-- README.md << you are here :P
 ```
