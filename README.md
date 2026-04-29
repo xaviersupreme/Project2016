@@ -11,6 +11,7 @@ A 2016 CoreGui remake for Roblox
 - **Old Graphics** -- Classic Enum.Technology.Compatibility lighting
 - **Old Bubble Chat** -- Classic bubble chat style (if u even have chat lolx)
 - **Old Player List** -- Old UI Player list
+- **Old escape menu**
 - **Custom Topbar Icons** -- Game made topbar icons are automatically styled
 - **FPS Counter** -- Optional FPS display in the topbar
 - **Old Stud Textures** -- Old stud overlays on plastic parts
