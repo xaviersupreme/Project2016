@@ -10,6 +10,7 @@ getgenv().Config2016 = getgenv().Config2016 or ({
     OldGraphics = true,
     OldPlayerList = true,
     OldBubbleChat = true,
+    OldEscapeMenu = true,
 
     ReplaceAgeGroupMessage = true,
     HideVoiceChatButton = false,

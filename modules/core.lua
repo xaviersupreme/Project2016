@@ -34,6 +34,7 @@ local Configuration = ({
 	OldGraphics = true,
 	OldPlayerList = true,
 	OldBubbleChat = true,
+	OldEscapeMenu = true,
 
 	ReplaceAgeGroupMessage = true,
 	HideVoiceChatButton = false,
@@ -50,9 +51,34 @@ end
 
 getgenv().Config2016 = Configuration
 
-if (Core2016) then
-	return
+if (getgenv().Core2016Data) then
+	for _, Connection in next, (getgenv().Core2016Data.Connections or {}) do
+		pcall(function()
+			Connection:Disconnect();
+		end)
+	end
+
+	for _, Object in next, (getgenv().Core2016Data.Objects or {}) do
+		pcall(function()
+			Object:Destroy();
+		end)
+	end
 end
+
+for _, Object in next, CoreGui:GetChildren() do
+	if ((Object.Name == "Project2016RobloxGui") or (Object.Name == "Settings2016Gui") or (Object.Name == "Core2016SettingsGui")) then
+		pcall(function()
+			Object:Destroy();
+		end)
+	elseif (Object.Name == "RobloxGui" and Object:IsA("ScreenGui") and not Object:FindFirstChild("Modules")) then
+		pcall(function()
+			Object:Destroy();
+		end)
+	end
+end
+
+getgenv().Core2016 = nil
+Core2016 = nil
 
 -- Luau
 local Spawn, Wait, Defer = task.spawn, task.wait, task.defer
@@ -60,7 +86,18 @@ local Byte, Sub, Format, Match, Find, Replace = string.byte, string.sub, string.
 local Floor, Random, Clamp = math.floor, math.random, math.clamp
 local Discover, Insert = table.find, table.insert
 
-local Connect = (game.Loaded.Connect);
+local Core2016Data = ({
+	Connections = ({}),
+	Objects = ({}),
+})
+getgenv().Core2016Data = Core2016Data
+
+local RawConnect = (game.Loaded.Connect);
+local Connect = function(Signal, Callback)
+	local Connection = RawConnect(Signal, Callback);
+	Insert(Core2016Data.Connections, Connection);
+	return Connection
+end
 local Clone = (game.Clone);
 local Destroy = (game.Destroy);
 local Changed = (game.GetPropertyChangedSignal);
@@ -163,6 +200,10 @@ local GetImage = function(Type: "Backpack" | "Chat" | "Menu", Visible)
 	}
 
 	return Images[Type][tostring(Visible)]
+end
+
+local LoadProjectModule = function(ModuleName)
+	return loadstring(game:HttpGet(Repo .. "modules/" .. ModuleName .. ".lua"))();
 end
 
 local CreateBackpack = function()
@@ -348,10 +389,11 @@ local SetupChat = function()
 		end)
 
 		-- update the chat player format (Player1: Message -> [Player1]: Message)
-		local BottomLockedScrollView = ChatWindowMain:WaitForChild("scrollingView"):WaitForChild("bottomLockedScrollView");
-		local ScrollView = BottomLockedScrollView:WaitForChild("RCTScrollView");
-		local Chats = ScrollView:WaitForChild("RCTScrollContentView");
-		local Padding = BottomLockedScrollView:WaitForChild("padding", 1);
+		local ScrollingView = ChatWindowMain:WaitForChild("scrollingView", 2);
+		local BottomLockedScrollView = ScrollingView and ScrollingView:WaitForChild("bottomLockedScrollView", 2);
+		local ScrollView = BottomLockedScrollView and BottomLockedScrollView:WaitForChild("RCTScrollView", 2);
+		local Chats = ScrollView and ScrollView:WaitForChild("RCTScrollContentView", 2);
+		local Padding = BottomLockedScrollView and BottomLockedScrollView:WaitForChild("padding", 1);
 
 		local UpdateChatMessage = function(Message)
 			local TextMessage = Message and Message:FindFirstChild("TextMessage");
@@ -396,9 +438,11 @@ local SetupChat = function()
 			end
 		end
 
-		Connect(Chats.ChildAdded, UpdateChatMessage);
-		for _, ChatObject in next, Chats:GetChildren() do
-			UpdateChatMessage(ChatObject);
+		if (Chats) then
+			Connect(Chats.ChildAdded, UpdateChatMessage);
+			for _, ChatObject in next, Chats:GetChildren() do
+				UpdateChatMessage(ChatObject);
+			end
 		end
 
 		if (Padding) then
@@ -891,11 +935,12 @@ local TopbarBackground, AccountInfo
 
 if (not Core2016) then
 	local CustomScreenGui = Create("ScreenGui", {
-		Name = "RobloxGui",
+		Name = "Project2016RobloxGui",
 		Parent = CoreGui,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
 	})
+	Insert(Core2016Data.Objects, CustomScreenGui);
 
 	TopbarBackground = Create("Frame", {
 		Parent = CustomScreenGui,
@@ -999,11 +1044,22 @@ end
 if (Configuration.OldConsole) then
 	Spawn(function()
 		local Success, Error = pcall(function()
-			loadstring(game:HttpGet(Repo .. "modules/console.lua"))();
+			LoadProjectModule("console");
 		end)
 
 		if (not Success) then
 			warn("[Core2016] Failed to load OldConsole:", Error);
+		end
+	end)
+end
+
+if (Configuration.OldEscapeMenu) then
+	Spawn(function()
+		local Success, Error = pcall(function()
+			LoadProjectModule("settings");
+		end)
+		if (not Success) then
+			warn("[Core2016] Failed to load OldEscapeMenu:", Error);
 		end
 	end)
 end
@@ -1044,6 +1100,262 @@ if (Configuration.OldPlayerList) then
 	local LeaderstatColumns = ({});
 	local PlayerUpdateFunctions = ({});
 	local TotalWidth = 170
+	local ControlWidth = 150
+	local ActivePlayerObject = nil
+	local ActivePlayerControls = nil
+	local LastSelectedPlayer = nil
+	local POPUP_ENTRY_SIZE_Y = 24
+	local ENTRY_PAD = 2
+	local BG_TRANSPARENCY = 0.5
+	local BG_COLOR = Color3.new(31/255, 31/255, 31/255)
+	local TEXT_STROKE_TRANSPARENCY = 0.75
+	local TEXT_COLOR = Color3.new(1, 1, 243/255)
+	local TEXT_STROKE_COLOR = Color3.new(34/255, 34/255, 34/255)
+	local TWEEN_TIME = 0.15
+	local MAX_FRIEND_COUNT = 200
+	local FRIEND_IMAGE = "rbxthumb://type=AvatarHeadShot&id="
+	local HttpService = game:GetService("HttpService")
+	local HttpRbxApiService = nil
+	local RemoteEvent_NewFollower = nil
+	local followerSuccess, isFollowersEnabled = pcall(function() return settings():GetFFlag("EnableLuaFollowers") end)
+	local IsFollowersEnabled = followerSuccess and isFollowersEnabled
+	local serverFollowersSuccess, serverFollowersEnabled = pcall(function() return settings():GetFFlag("UserServerFollowers") end)
+	local IsServerFollowers = serverFollowersSuccess and serverFollowersEnabled
+
+	pcall(function()
+		HttpRbxApiService = game:GetService("HttpRbxApiService")
+	end)
+
+	Spawn(function()
+		pcall(function()
+			local RobloxReplicatedStorage = game:GetService("RobloxReplicatedStorage")
+			RemoteEvent_NewFollower = RobloxReplicatedStorage:WaitForChild("NewFollower", 2)
+		end)
+	end)
+
+	local function createSignal()
+		local Signal = {}
+		local Signaler = Instance.new("BindableEvent")
+		local ArgData = nil
+		local ArgDataCount = nil
+
+		function Signal:fire(...)
+			ArgData = { ... }
+			ArgDataCount = select("#", ...)
+			Signaler:Fire()
+		end
+
+		function Signal:connect(Callback)
+			if (not Callback) then
+				error("connect(nil)", 2)
+			end
+
+			return Signaler.Event:Connect(function()
+				Callback(unpack(ArgData, 1, ArgDataCount))
+			end)
+		end
+
+		function Signal:wait()
+			Signaler.Event:Wait()
+			assert(ArgData, "Missing arg data, likely due to :TweenSize/Position corrupting threadrefs.")
+			return unpack(ArgData, 1, ArgDataCount)
+		end
+
+		return Signal
+	end
+
+	local BlockStatusChanged = createSignal()
+	local FollowerStatusChanged = createSignal()
+	local BlockedList = ({})
+	local MutedList = ({})
+	local IsPersonalServer = false
+	local PersonalServerService = nil
+	local PRIVILEGE_LEVEL = ({
+		OWNER = 255,
+		ADMIN = 240,
+		MEMBER = 128,
+		VISITOR = 10,
+		BANNED = 0,
+	})
+
+	if (game.Workspace:FindFirstChild("PSVariable")) then
+		IsPersonalServer = true
+		pcall(function()
+			PersonalServerService = game:GetService("PersonalServerService")
+		end)
+	end
+
+	Connect(game.Workspace.ChildAdded, function(Child)
+		if (Child.Name == "PSVariable" and Child:IsA("BoolValue")) then
+			IsPersonalServer = true
+			pcall(function()
+				PersonalServerService = game:GetService("PersonalServerService")
+			end)
+		end
+	end)
+
+	local GetUserId = function(Player)
+		return Player and (Player.UserId or Player.userId) or 0
+	end
+
+	local sendNotification = function(Title, Text, Image, Duration, Callback)
+		pcall(function()
+			StarterGui:SetCore("SendNotification", {
+				Title = Title,
+				Text = Text,
+				Icon = Image,
+				Duration = Duration,
+				Callback = Callback,
+			})
+		end)
+	end
+
+	local getFriendStatus = function(SelectedPlayer)
+		if (SelectedPlayer == LocalPlayer) then
+			return Enum.FriendStatus.NotFriend
+		else
+			local Success, Result = pcall(function()
+				return LocalPlayer:GetFriendStatus(SelectedPlayer)
+			end)
+
+			if (Success) then
+				return Result
+			else
+				return Enum.FriendStatus.NotFriend
+			end
+		end
+	end
+
+	local getFriendCountAsync = function(UserId)
+		if (not HttpRbxApiService) then
+			return nil
+		end
+
+		local WasSuccess, Result = pcall(function()
+			local Path = "user/get-friendship-count"
+			if (UserId) then
+				Path = Path .. "?userId=" .. tostring(UserId)
+			end
+			return HttpRbxApiService:GetAsync(Path, true)
+		end)
+
+		if (not WasSuccess) then
+			print("getFriendCountAsync() failed because", Result)
+			return nil
+		end
+
+		Result = HttpService:JSONDecode(Result)
+		if (Result["success"] and Result["count"]) then
+			return Result["count"]
+		end
+
+		return nil
+	end
+
+	local canSendFriendRequestAsync = function(OtherPlayer)
+		local TheirFriendCount = getFriendCountAsync(GetUserId(OtherPlayer))
+		local MyFriendCount = getFriendCountAsync()
+
+		if (not MyFriendCount or not TheirFriendCount) then
+			return false
+		end
+
+		if (MyFriendCount < MAX_FRIEND_COUNT and TheirFriendCount < MAX_FRIEND_COUNT) then
+			return true
+		elseif (MyFriendCount >= MAX_FRIEND_COUNT) then
+			sendNotification("Cannot send friend request", "You are at the max friends limit.", "", 5, function() end)
+			return false
+		elseif (TheirFriendCount >= MAX_FRIEND_COUNT) then
+			sendNotification("Cannot send friend request", OtherPlayer.Name .. " is at the max friends limit.", "", 5, function() end)
+			return false
+		end
+	end
+
+	local isFollowing = function(UserId, FollowerUserId)
+		if (not HttpRbxApiService) then
+			return false
+		end
+
+		local Success, Result = pcall(function()
+			return HttpRbxApiService:GetAsync("user/following-exists?userId=" .. tostring(UserId) .. "&followerUserId=" .. tostring(FollowerUserId), true)
+		end)
+
+		if (not Success) then
+			print("isFollowing() failed because", Result)
+			return false
+		end
+
+		Result = HttpService:JSONDecode(Result)
+		return Result["success"] and Result["isFollowing"]
+	end
+
+	local GetBlockedPlayersAsync = function()
+		local UserId = GetUserId(LocalPlayer)
+		if (UserId > 0 and HttpRbxApiService) then
+			local BlockList = nil
+			pcall(function()
+				local Request = HttpRbxApiService:GetAsync("userblock/getblockedusers?userId=" .. tostring(UserId) .. "&page=1")
+				BlockList = Request and HttpService:JSONDecode(Request)
+			end)
+
+			if (BlockList and BlockList["success"] == true and BlockList["userList"]) then
+				return BlockList["userList"]
+			end
+		end
+
+		return {}
+	end
+
+	Spawn(function()
+		BlockedList = GetBlockedPlayersAsync()
+	end)
+
+	local isBlocked = function(UserId)
+		return (BlockedList[UserId] ~= nil and BlockedList[UserId] == true)
+	end
+
+	local isMuted = function(UserId)
+		return (MutedList[UserId] ~= nil and MutedList[UserId] == true)
+	end
+
+	local BlockPlayerAsync = function(PlayerToBlock)
+		if (PlayerToBlock and LocalPlayer ~= PlayerToBlock) then
+			local BlockUserId = GetUserId(PlayerToBlock)
+			if (BlockUserId > 0 and not isBlocked(BlockUserId)) then
+				BlockedList[BlockUserId] = true
+				BlockStatusChanged:fire(BlockUserId, true)
+				pcall(function()
+					Players:BlockUser(GetUserId(LocalPlayer), BlockUserId)
+				end)
+			end
+		end
+	end
+
+	local UnblockPlayerAsync = function(PlayerToUnblock)
+		if (PlayerToUnblock) then
+			local UnblockUserId = GetUserId(PlayerToUnblock)
+			if (isBlocked(UnblockUserId)) then
+				BlockedList[UnblockUserId] = nil
+				BlockStatusChanged:fire(UnblockUserId, false)
+				pcall(function()
+					Players:UnblockUser(GetUserId(LocalPlayer), UnblockUserId)
+				end)
+			end
+		end
+	end
+
+	local onPrivilegeLevelSelect = function(Player, Rank)
+		if (not PersonalServerService) then
+			return
+		end
+
+		while (Player.PersonalServerRank < Rank) do
+			PersonalServerService:Promote(Player)
+		end
+		while (Player.PersonalServerRank > Rank) do
+			PersonalServerService:Demote(Player)
+		end
+	end
 
 	local GetSize = function(X: number)
 		local Viewport = workspace.CurrentCamera.ViewportSize
@@ -1068,6 +1380,10 @@ if (Configuration.OldPlayerList) then
 		Size = GetSize(170),
 	})
 
+	local SetPlayerListWidth = function(Width)
+		PlayerListContainer.Size = GetSize(Width);
+	end
+
 	local ScrollList = Create("ScrollingFrame", {
 		Name = "ScrollList",
 		Size = UDim2.new(1, 0, 1, 0),
@@ -1090,6 +1406,322 @@ if (Configuration.OldPlayerList) then
 		Parent = ScrollList,
 	})
 
+	local PopupClipFrame = Create("Frame", {
+		Name = "PopupClipFrame",
+		Size = UDim2.new(0, ControlWidth, 1.5, 0),
+		Position = UDim2.new(0, -ControlWidth - ENTRY_PAD, 0, 0),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Parent = PlayerListContainer,
+	})
+
+	local CreatePlayerDropDown = function()
+		local PlayerDropDown = {}
+		PlayerDropDown.Player = nil
+		PlayerDropDown.PopupFrame = nil
+		PlayerDropDown.HidePopupImmediately = false
+		PlayerDropDown.PopupFrameOffScreenPosition = nil
+		PlayerDropDown.HiddenSignal = createSignal()
+
+		local onFriendButtonPressed = function()
+			if (PlayerDropDown.Player) then
+				local Status = getFriendStatus(PlayerDropDown.Player)
+				if (Status == Enum.FriendStatus.Friend) then
+					LocalPlayer:RevokeFriendship(PlayerDropDown.Player)
+				elseif (Status == Enum.FriendStatus.Unknown or Status == Enum.FriendStatus.NotFriend) then
+					local CachedLastSelectedPlayer = PlayerDropDown.Player
+					Spawn(function()
+						if (canSendFriendRequestAsync(CachedLastSelectedPlayer)) then
+							if (CachedLastSelectedPlayer and CachedLastSelectedPlayer.Parent == Players) then
+								LocalPlayer:RequestFriendship(CachedLastSelectedPlayer)
+							end
+						end
+					end)
+				elseif (Status == Enum.FriendStatus.FriendRequestSent) then
+					LocalPlayer:RevokeFriendship(PlayerDropDown.Player)
+				elseif (Status == Enum.FriendStatus.FriendRequestReceived) then
+					LocalPlayer:RequestFriendship(PlayerDropDown.Player)
+				end
+
+				PlayerDropDown:Hide()
+			end
+		end
+
+		local onDeclineFriendButonPressed = function()
+			if (PlayerDropDown.Player) then
+				LocalPlayer:RevokeFriendship(PlayerDropDown.Player)
+				PlayerDropDown:Hide()
+			end
+		end
+
+		local onUnfollowButtonPressed = function()
+			if (not PlayerDropDown.Player or not HttpRbxApiService) then
+				PlayerDropDown:Hide()
+				return
+			end
+
+			local Success, Result = pcall(function()
+				return HttpRbxApiService:PostAsync("user/unfollow", "followedUserId=" .. tostring(GetUserId(PlayerDropDown.Player)), true, Enum.ThrottlingPriority.Default, Enum.HttpContentType.ApplicationUrlEncoded)
+			end)
+
+			if (not Success) then
+				print("unfollowPlayer() failed because", Result)
+				PlayerDropDown:Hide()
+				return
+			end
+
+			Result = HttpService:JSONDecode(Result)
+			if (Result["success"]) then
+				if (RemoteEvent_NewFollower) then
+					RemoteEvent_NewFollower:FireServer(PlayerDropDown.Player, false)
+				end
+				FollowerStatusChanged:fire()
+			end
+
+			PlayerDropDown:Hide()
+		end
+
+		local onBlockButtonPressed = function()
+			if (PlayerDropDown.Player) then
+				local CachedPlayer = PlayerDropDown.Player
+				Spawn(function()
+					BlockPlayerAsync(CachedPlayer)
+				end)
+				PlayerDropDown:Hide()
+			end
+		end
+
+		local onUnblockButtonPressed = function()
+			if (PlayerDropDown.Player) then
+				local CachedPlayer = PlayerDropDown.Player
+				Spawn(function()
+					UnblockPlayerAsync(CachedPlayer)
+				end)
+				PlayerDropDown:Hide()
+			end
+		end
+
+		local onReportButtonPressed = function()
+			if (PlayerDropDown.Player) then
+				local Env = getgenv()
+				if (Env.Settings2016 and Env.Settings2016.ReportPlayer) then
+					Env.Settings2016.ReportPlayer(Env.Settings2016, PlayerDropDown.Player)
+				end
+				PlayerDropDown:Hide()
+			end
+		end
+
+		local onFollowButtonPressed = function()
+			if (not PlayerDropDown.Player or not HttpRbxApiService) then
+				PlayerDropDown:Hide()
+				return
+			end
+
+			local FollowedUserId = tostring(GetUserId(PlayerDropDown.Player))
+			local Success, Result = pcall(function()
+				return HttpRbxApiService:PostAsync("user/follow", "followedUserId=" .. FollowedUserId, true, Enum.ThrottlingPriority.Default, Enum.HttpContentType.ApplicationUrlEncoded)
+			end)
+
+			if (not Success) then
+				print("followPlayer() failed because", Result)
+				PlayerDropDown:Hide()
+				return
+			end
+
+			Result = HttpService:JSONDecode(Result)
+			if (Result["success"]) then
+				sendNotification("You are", "now following " .. PlayerDropDown.Player.Name, FRIEND_IMAGE .. FollowedUserId .. "&w=48&h=48", 5, function() end)
+				if (RemoteEvent_NewFollower) then
+					RemoteEvent_NewFollower:FireServer(PlayerDropDown.Player, true)
+				end
+				FollowerStatusChanged:fire()
+			end
+
+			PlayerDropDown:Hide()
+		end
+
+		local createPersonalServerDialog = function(Buttons, SelectedPlayer)
+			local ShowPersonalServerRanks = IsPersonalServer and PersonalServerService and LocalPlayer.PersonalServerRank >= PRIVILEGE_LEVEL.ADMIN and LocalPlayer.PersonalServerRank > SelectedPlayer.PersonalServerRank
+			if (ShowPersonalServerRanks) then
+				Insert(Buttons, {
+					Name = "BanButton",
+					Text = "Ban",
+					OnPress = function()
+						PlayerDropDown:Hide()
+						onPrivilegeLevelSelect(SelectedPlayer, PRIVILEGE_LEVEL.BANNED)
+					end,
+				})
+				Insert(Buttons, {
+					Name = "VistorButton",
+					Text = "Visitor",
+					OnPress = function()
+						onPrivilegeLevelSelect(SelectedPlayer, PRIVILEGE_LEVEL.VISITOR)
+					end,
+				})
+				Insert(Buttons, {
+					Name = "MemberButton",
+					Text = "Member",
+					OnPress = function()
+						onPrivilegeLevelSelect(SelectedPlayer, PRIVILEGE_LEVEL.MEMBER)
+					end,
+				})
+				Insert(Buttons, {
+					Name = "AdminButton",
+					Text = "Admin",
+					OnPress = function()
+						onPrivilegeLevelSelect(SelectedPlayer, PRIVILEGE_LEVEL.ADMIN)
+					end,
+				})
+			end
+		end
+
+		local createPopupFrame = function(Buttons)
+			local Frame = Create("Frame", {
+				Name = "PopupFrame",
+				Size = UDim2.new(1, 0, 0, (POPUP_ENTRY_SIZE_Y * #Buttons) + (#Buttons - ENTRY_PAD)),
+				Position = UDim2.new(1, 1, 0, 0),
+				BackgroundTransparency = 1,
+			})
+
+			for Index, ButtonData in ipairs(Buttons) do
+				local Button = Create("TextButton", {
+					Parent = Frame,
+					Name = ButtonData.Name,
+					Size = UDim2.new(1, 0, 0, POPUP_ENTRY_SIZE_Y),
+					Position = UDim2.new(0, 0, 0, POPUP_ENTRY_SIZE_Y * (Index - 1) + ((Index - 1) * ENTRY_PAD)),
+					BackgroundTransparency = BG_TRANSPARENCY,
+					BackgroundColor3 = BG_COLOR,
+					BorderSizePixel = 0,
+					Text = ButtonData.Text,
+					Font = Enum.Font.SourceSans,
+					FontSize = Enum.FontSize.Size14,
+					TextColor3 = TEXT_COLOR,
+					TextStrokeTransparency = TEXT_STROKE_TRANSPARENCY,
+					TextStrokeColor3 = TEXT_STROKE_COLOR,
+					AutoButtonColor = true,
+				})
+
+				Connect(Button.MouseButton1Click, ButtonData.OnPress)
+			end
+
+			return Frame
+		end
+
+		function PlayerDropDown:Hide()
+			if (PlayerDropDown.PopupFrame) then
+				local OffscreenPosition = (PlayerDropDown.PopupFrameOffScreenPosition ~= nil and PlayerDropDown.PopupFrameOffScreenPosition or UDim2.new(1, 1, 0, PlayerDropDown.PopupFrame.Position.Y.Offset))
+				if (not PlayerDropDown.HidePopupImmediately) then
+					PlayerDropDown.PopupFrame:TweenPosition(OffscreenPosition, Enum.EasingDirection.InOut, Enum.EasingStyle.Quad, TWEEN_TIME, true, function()
+						if (PlayerDropDown.PopupFrame) then
+							Destroy(PlayerDropDown.PopupFrame)
+							PlayerDropDown.PopupFrame = nil
+						end
+					end)
+				else
+					Destroy(PlayerDropDown.PopupFrame)
+					PlayerDropDown.PopupFrame = nil
+				end
+			end
+
+			if (PlayerDropDown.Player) then
+				PlayerDropDown.Player = nil
+			end
+
+			PlayerDropDown.HiddenSignal:fire()
+		end
+
+		function PlayerDropDown:CreatePopup(Player)
+			PlayerDropDown.Player = Player
+			local Buttons = {}
+			local Status = getFriendStatus(PlayerDropDown.Player)
+			local FriendText = ""
+			local CanDeclineFriend = false
+
+			if (Status == Enum.FriendStatus.Friend) then
+				FriendText = "Unfriend Player"
+			elseif (Status == Enum.FriendStatus.Unknown or Status == Enum.FriendStatus.NotFriend) then
+				FriendText = "Send Friend Request"
+			elseif (Status == Enum.FriendStatus.FriendRequestSent) then
+				FriendText = "Revoke Friend Request"
+			elseif (Status == Enum.FriendStatus.FriendRequestReceived) then
+				FriendText = "Accept Friend Request"
+				CanDeclineFriend = true
+			end
+
+			local Blocked = isBlocked(GetUserId(PlayerDropDown.Player))
+			if (not Blocked) then
+				Insert(Buttons, {
+					Name = "FriendButton",
+					Text = FriendText,
+					OnPress = onFriendButtonPressed,
+				})
+			end
+
+			if (CanDeclineFriend and not Blocked) then
+				Insert(Buttons, {
+					Name = "DeclineFriend",
+					Text = "Decline Friend Request",
+					OnPress = onDeclineFriendButonPressed,
+				})
+			end
+
+			if (IsServerFollowers or IsFollowersEnabled) then
+				local Following = isFollowing(GetUserId(PlayerDropDown.Player), GetUserId(LocalPlayer))
+				if (not Blocked) then
+					Insert(Buttons, {
+						Name = "FollowerButton",
+						Text = Following and "Unfollow Player" or "Follow Player",
+						OnPress = Following and onUnfollowButtonPressed or onFollowButtonPressed,
+					})
+				end
+			end
+
+			Insert(Buttons, {
+				Name = "BlockButton",
+				Text = Blocked and "Unblock Player" or "Block Player",
+				OnPress = Blocked and onUnblockButtonPressed or onBlockButtonPressed,
+			})
+			Insert(Buttons, {
+				Name = "ReportButton",
+				Text = "Report Abuse",
+				OnPress = onReportButtonPressed,
+			})
+
+			createPersonalServerDialog(Buttons, PlayerDropDown.Player)
+			if (PlayerDropDown.PopupFrame) then
+				Destroy(PlayerDropDown.PopupFrame)
+			end
+
+			PlayerDropDown.PopupFrame = createPopupFrame(Buttons)
+			return PlayerDropDown.PopupFrame
+		end
+
+		Connect(Players.PlayerRemoving, function(LeavingPlayer)
+			if (PlayerDropDown.Player == LeavingPlayer) then
+				PlayerDropDown:Hide()
+			end
+		end)
+
+		return PlayerDropDown
+	end
+
+	local PlayerDropDown = CreatePlayerDropDown()
+
+	local CloseControls = function()
+		PlayerDropDown:Hide()
+	end
+
+	PlayerDropDown.HiddenSignal:connect(function()
+		if (ActivePlayerObject) then
+			ActivePlayerObject.BackgroundColor3 = BG_COLOR
+		end
+
+		ScrollList.ScrollingEnabled = true
+		ActivePlayerObject = nil
+		ActivePlayerControls = nil
+		LastSelectedPlayer = nil
+	end)
+
 	local UpdateLeaderstats = function()
 		LeaderstatColumns = ({});
 		local Stats = LocalPlayer:FindFirstChild("leaderstats");
@@ -1103,7 +1735,7 @@ if (Configuration.OldPlayerList) then
 		end
 
 		TotalWidth = 170 + (#LeaderstatColumns * 60);
-		PlayerListContainer.Size = GetSize(TotalWidth);
+		SetPlayerListWidth(TotalWidth);
 
 		for _, Data in next, TeamFrames do
 			local HeaderIgnorePaddingFrame = Data.Header:FindFirstChild("HeaderIgnorePaddingFrame");
@@ -1271,7 +1903,6 @@ if (Configuration.OldPlayerList) then
 	end
 
 	local AddPlayer = function(Player)
-		local Open = false
 		local CurrentTeamKey = nil
 		local PlayerObject
 
@@ -1291,6 +1922,7 @@ if (Configuration.OldPlayerList) then
 
 			local TeamData = CreateTeamFrame(TeamKey)
 			PlayerObject.Parent = TeamData.Container
+			UpdatePlayerOrder(Player);
 
 			if (TeamData and TeamData.UpdateTeamStats) then
 				TeamData.UpdateTeamStats();
@@ -1414,100 +2046,46 @@ if (Configuration.OldPlayerList) then
 		end)
 
 		Connect(Changed(Player, "Team"), UpdatePlayerTeam);
-		Connect(PlayerObject.MouseButton1Click, function()
-			if (not Open) then
-				local Descendants = ScrollList:GetDescendants();
 
-				for _, User in next, Descendants do
-					if (User.Name == "PlayerControlsHolder") then
-						Destroy(User);
-					end
-				end
-
-				for _, User in next, Descendants do
-					if (User:IsA("TextButton") and User.Name ~= "TeamHeader") then
-						User.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-					end
-				end
-
-				local PlayerControlsHolder = Create("Frame", {
-					Parent = PlayerObject,
-					Name = "PlayerControlsHolder",
-					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 1, 0),
-					Position = UDim2.new(-1, -25, 0, 0),
-					Visible = true,
-				})
-
-				local FriendButton = Create("TextButton", {
-					Parent = PlayerControlsHolder,
-					BackgroundColor3 = Color3.fromRGB(31, 31, 31),
-					BackgroundTransparency = 0.500,
-					BorderSizePixel = 0,
-					Size = UDim2.new(0, 157, 0, 24),
-					AutoButtonColor = true,
-					TextSize = 14,
-					Font = Enum.Font.SourceSans,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					Text = "Send a friend request",
-				})
-
-				local ReportButton = Create("TextButton", {
-					Parent = PlayerControlsHolder,
-					BackgroundColor3 = Color3.fromRGB(31, 31, 31),
-					BackgroundTransparency = 0.500,
-					BorderSizePixel = 0,
-					Size = UDim2.new(0, 157, 0, 24),
-					AutoButtonColor = true,
-					TextSize = 14,
-					Font = Enum.Font.SourceSans,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					Text = "Report abuse",
-				})
-
-				Create("UIListLayout", {
-					Parent = PlayerControlsHolder,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					VerticalAlignment = Enum.VerticalAlignment.Top,
-					HorizontalAlignment = Enum.HorizontalAlignment.Right,
-					Padding = UDim.new(0, 2),
-				})
-
-				Create("UIPadding", {
-					Parent = FriendButton,
-					PaddingLeft = UDim.new(0, 36),
-				})
-
-				Create("UIPadding", {
-					Parent = ReportButton,
-					PaddingLeft = UDim.new(0, 36),
-				})
-
-				PlayerObject.BackgroundColor3 = Color3.fromRGB(0, 255, 255)                
-				Connect(FriendButton.MouseButton1Click, function()
-					local PlayerControlsHolder = PlayerObject:FindFirstChild("PlayerControlsHolder");
-					LocalPlayer:RequestFriendship(Player);
-
-					if (PlayerControlsHolder) then
-						Destroy(PlayerControlsHolder);
-						PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-					end
-
-					Open = false
-				end)
-			else
-				local PlayerControlsHolder = PlayerObject:FindFirstChild("PlayerControlsHolder");
-				PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
-
-				if (PlayerControlsHolder) then
-					Destroy(PlayerControlsHolder);
-				end
+		Connect(PlayerObject.MouseEnter, function()
+			if (PlayerObject ~= ActivePlayerObject) then
+				PlayerObject.BackgroundColor3 = Color3.fromRGB(55, 55, 55);
 			end
+		end)
 
-			Open = (not Open);
-			PlayerListContainer.Size = GetSize((Open and (TotalWidth + 157)) or TotalWidth);
+		Connect(PlayerObject.MouseLeave, function()
+			if (PlayerObject ~= ActivePlayerObject) then
+				PlayerObject.BackgroundColor3 = Color3.fromRGB(31, 31, 31);
+			end
+		end)
+
+		Connect(PlayerObject.MouseButton1Click, function()
+			local WasOpen = (ActivePlayerObject == PlayerObject)
+
+			if (Player ~= LocalPlayer and GetUserId(Player) > 1 and GetUserId(LocalPlayer) > 1 and not WasOpen) then
+				if (ActivePlayerObject) then
+					ActivePlayerObject.BackgroundColor3 = BG_COLOR
+				end
+
+				if (PlayerDropDown.PopupFrame) then
+					Destroy(PlayerDropDown.PopupFrame)
+					PlayerDropDown.PopupFrame = nil
+				end
+
+				ActivePlayerObject = PlayerObject
+				ActivePlayerControls = nil
+				LastSelectedPlayer = Player
+				PlayerObject.BackgroundColor3 = Color3.new(0, 1, 1)
+				ScrollList.ScrollingEnabled = false
+
+				local PopupY = PlayerObject.AbsolutePosition.Y - PlayerListContainer.AbsolutePosition.Y
+				local PopupFrame = PlayerDropDown:CreatePopup(Player)
+				PopupFrame.Position = UDim2.new(1, 1, 0, PopupY)
+				PopupFrame.Parent = PopupClipFrame
+				PopupFrame:TweenPosition(UDim2.new(0, 0, 0, PopupY), Enum.EasingDirection.InOut, Enum.EasingStyle.Quad, TWEEN_TIME, true)
+			else
+				CloseControls();
+			end
 		end)
 
 		Defer(function()
@@ -1539,6 +2117,12 @@ if (Configuration.OldPlayerList) then
 
 	Connect(Players.PlayerRemoving, function(Player)
 		PlayerUpdateFunctions[Player] = nil
+
+		if (ActivePlayerObject and ActivePlayerObject.Name == Player.Name) then
+			ActivePlayerObject = nil
+			ActivePlayerControls = nil
+			SetPlayerListWidth(TotalWidth);
+		end
 
 		for _, Data in next, TeamFrames do
 			for _, User in next, Data.Container:GetChildren() do
