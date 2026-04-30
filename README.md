@@ -34,8 +34,9 @@ A 2016 CoreGui remake for Roblox
   </a>
 </p>
 
+> [!NOTE]
 > Originally by **lxte**, modded by **me**. Inspired by spec / scot.wtf's Project2016.
-
+>
 > there WILL be bugs.. 😈 (Make a PR if you find any bugs or want a feature)
 
 ## Features
