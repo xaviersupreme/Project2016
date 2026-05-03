@@ -3,6 +3,16 @@
 
 local Repo = "https://raw.githubusercontent.com/xaviersupreme/Project2016/main/"
 
+if (not game:IsLoaded()) then
+	pcall(function()
+		loadstring(game:HttpGet(Repo .. "modules/loading.lua"))();
+	end)
+
+	if (not game:IsLoaded()) then
+		game.Loaded:Wait();
+	end
+end
+
 -- Services
 local CoreGui = game:GetService("CoreGui");
 local TextChatService = game:GetService("TextChatService");

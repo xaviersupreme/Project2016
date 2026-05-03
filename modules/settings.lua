@@ -618,7 +618,7 @@ local MakePlayerRow = function(Page, Player, Index)
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = Player.Name,
-		Size = UDim2.new(1, -260, 1, 0),
+		Size = UDim2.new(1, -470, 1, 0),
 		Position = UDim2.new(0, 60, 0, 0),
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
@@ -633,6 +633,47 @@ local MakePlayerRow = function(Page, Player, Index)
 		ZIndex = SETTINGS_BASE_ZINDEX + 3,
 	})
 
+	local FlagButton = MakeStyledButton(Player.Name .. "FlagButton", "", UDim2.new(0, 44, 0, 40), function()
+		if (getgenv().Settings2016 and getgenv().Settings2016.ReportPlayer) then
+			getgenv().Settings2016:ReportPlayer(Player);
+		end
+	end)
+	FlagButton.Parent = Row
+	FlagButton.Position = UDim2.new(1, -450, 0.5, -20);
+
+	Create("ImageLabel", {
+		Parent = FlagButton,
+		BackgroundTransparency = 1,
+		Image = "rbxasset://textures/ui/Settings/MenuBarIcons/ReportAbuseTab.png",
+		Size = UDim2.new(0, 26, 0, 32),
+		Position = UDim2.new(0.5, -13, 0.5, -16),
+		ZIndex = SETTINGS_BASE_ZINDEX + 4,
+	})
+
+	local ViewButton = MakeStyledButton(Player.Name .. "ViewButton", "View", UDim2.new(0, 104, 0, 40), function()
+		Protect(function()
+			GuiService:InspectPlayerFromUserId(Player.UserId or Player.userId);
+		end)
+	end)
+	ViewButton.Parent = Row
+	ViewButton.Position = UDim2.new(1, -390, 0.5, -20);
+
+	local FollowButton, FollowLabel
+	FollowButton, FollowLabel = MakeStyledButton(Player.Name .. "FollowButton", "Follow", UDim2.new(0, 104, 0, 40), function()
+		Protect(function()
+			local Character = Player.Character
+			local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid");
+			local Camera = workspace.CurrentCamera
+
+			if (Humanoid and Camera) then
+				Camera.CameraSubject = Humanoid
+				FollowLabel.Text = "Following"
+			end
+		end)
+	end)
+	FollowButton.Parent = Row
+	FollowButton.Position = UDim2.new(1, -270, 0.5, -20);
+
 	local Status = nil
 	Protect(function()
 		if (Player ~= LocalPlayer and (Player.UserId or Player.userId) > 1 and (LocalPlayer.UserId or LocalPlayer.userId) > 1) then
@@ -645,8 +686,8 @@ local MakePlayerRow = function(Page, Player, Index)
 		FriendButton = Create("TextButton", {
 			Text = "",
 			BackgroundTransparency = 1,
-			Size = UDim2.new(0, 182, 0, 46),
-			Position = UDim2.new(1, -198, 0, 7),
+			Size = UDim2.new(0, 156, 0, 40),
+			Position = UDim2.new(1, -164, 0.5, -20),
 			ZIndex = SETTINGS_BASE_ZINDEX + 3,
 			Parent = Row,
 		})
@@ -657,8 +698,8 @@ local MakePlayerRow = function(Page, Player, Index)
 			Font = Enum.Font.SourceSans,
 			TextSize = 24,
 			TextColor3 = Color3.new(1, 1, 1),
-			Size = UDim2.new(0, 182, 0, 46),
-			Position = UDim2.new(1, -198, 0, 7),
+			Size = UDim2.new(0, 156, 0, 40),
+			Position = UDim2.new(1, -164, 0.5, -20),
 			ZIndex = SETTINGS_BASE_ZINDEX + 3,
 			Parent = Row,
 		})
@@ -669,13 +710,13 @@ local MakePlayerRow = function(Page, Player, Index)
 			Font = Enum.Font.SourceSans,
 			TextSize = 24,
 			TextColor3 = Color3.new(1, 1, 1),
-			Size = UDim2.new(0, 182, 0, 46),
-			Position = UDim2.new(1, -198, 0, 7),
+			Size = UDim2.new(0, 156, 0, 40),
+			Position = UDim2.new(1, -164, 0.5, -20),
 			ZIndex = SETTINGS_BASE_ZINDEX + 3,
 			Parent = Row,
 		})
 	else
-		FriendButton, FriendLabel = MakeStyledButton("FriendStatus", "Add Friend", UDim2.new(0, 182, 0, 46), function()
+		FriendButton, FriendLabel = MakeStyledButton("FriendStatus", "Add Friend", UDim2.new(0, 156, 0, 40), function()
 			if (FriendLabel and FriendLabel.Text ~= "") then
 				FriendButton.ImageTransparency = 1
 				FriendLabel.Text = ""
@@ -683,7 +724,7 @@ local MakePlayerRow = function(Page, Player, Index)
 			end
 		end)
 		FriendButton.Parent = Row
-		FriendButton.Position = UDim2.new(1, -198, 0, 7)
+		FriendButton.Position = UDim2.new(1, -164, 0.5, -20)
 		if (FriendLabel) then
 			FriendLabel.ZIndex = SETTINGS_BASE_ZINDEX + 3
 			FriendLabel.Position = FriendLabel.Position + UDim2.new(0, 0, 0, 1)
