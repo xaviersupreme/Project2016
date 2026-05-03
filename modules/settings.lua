@@ -1,6 +1,8 @@
 local CoreGui = game:GetService("CoreGui");
 local ContextActionService = game:GetService("ContextActionService");
 local UserInputService = game:GetService("UserInputService");
+local GuiService = game:GetService("GuiService");
+local StarterGui = game:GetService("StarterGui");
 local SoundService = game:GetService("SoundService");
 local Players = game:GetService("Players");
 
@@ -25,6 +27,9 @@ local TAB_SELECTION_IMAGE = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuS
 local DROP_DOWN_IMAGE = "rbxasset://textures/ui/Settings/DropDown/DropDown.png";
 local PLAYER_LIST_OFFSET = 20
 local DESCRIPTION_PLACEHOLDER = "Short Description (Optional)"
+local PAGE_TOP_PADDING = 12
+local KEY_F12 = 0x7B
+local KEY_PRINT_SCREEN = 0x2C
 
 local GetHeadshot = function(Player)
 	return "rbxthumb://type=AvatarHeadShot&id=" .. tostring(math.max(1, Player.UserId or Player.userId or 1)) .. "&w=48&h=48"
@@ -258,7 +263,7 @@ local MakePage = function(Name)
 		Row.Parent = self.Frame
 		Row.Position = UDim2.new(0, 0, 0, #self.Rows * 50);
 		Insert(self.Rows, Row);
-		self.Frame.Size = UDim2.new(1, 0, 0, #self.Rows * 50);
+		self.Frame.Size = UDim2.new(1, 0, 0, PAGE_TOP_PADDING + (#self.Rows * 50));
 	end
 
 	return Page
@@ -509,20 +514,20 @@ SwitchToPage = function(Page, NoStack)
 
 	if (OldFrame and OldFrame ~= Page.Frame and OldFrame.Parent == Hub.PageView and OldFrame.Visible) then
 		local PageWidth = math.max(Hub.PageClipper.AbsoluteSize.X, 800);
-		Page.Frame.Position = UDim2.new(0, Direction * PageWidth, 0, 0);
-		MoveTo(Page.Frame, UDim2.new(0, 0, 0, 0), nil, 12);
-		MoveTo(OldFrame, UDim2.new(0, -Direction * PageWidth, 0, 0), nil, 12);
+		Page.Frame.Position = UDim2.new(0, Direction * PageWidth, 0, PAGE_TOP_PADDING);
+		MoveTo(Page.Frame, UDim2.new(0, 0, 0, PAGE_TOP_PADDING), nil, 12);
+		MoveTo(OldFrame, UDim2.new(0, -Direction * PageWidth, 0, PAGE_TOP_PADDING), nil, 12);
 		task.delay(0.22, function()
 			if (Hub.CurrentPage ~= OldPage and OldFrame) then
 				OldFrame.Visible = false
 			end
 		end)
 	else
-		Page.Frame.Position = UDim2.new(0, 0, 0, 0);
+		Page.Frame.Position = UDim2.new(0, 0, 0, PAGE_TOP_PADDING);
 	end
 
 	Hub.PageView.CanvasPosition = Vector2.new(0, 0);
-	Hub.PageView.CanvasSize = UDim2.new(0, 0, 0, math.max(Page.Frame.Size.Y.Offset, Hub.PageClipper.AbsoluteSize.Y));
+	Hub.PageView.CanvasSize = UDim2.new(0, 0, 0, math.max(Page.Frame.Size.Y.Offset + PAGE_TOP_PADDING, Hub.PageClipper.AbsoluteSize.Y));
 	Hub.CurrentPage = Page
 
 	if (Page.Selection) then
@@ -1218,7 +1223,11 @@ end)
 
 MakeSelector(GamePage, "Fullscreen", ({ "On", "Off" }), (GameSettings:InFullScreen() and 1) or 2, function()
 	Protect(function()
-		if (keypress and keyrelease) then
+		local Success = pcall(function()
+			GuiService:ToggleFullscreen();
+		end)
+
+		if ((not Success) and keypress and keyrelease) then
 			keypress(0x7A); keyrelease(0x7A);
 		end
 	end)
@@ -1478,6 +1487,83 @@ local MenuFrame = CreateHelpGroup("Menu Items", ({
 }), UDim2.new(1 / 3, 4, 0, CharMoveFrame.Size.Y.Offset + 50));
 
 HelpPage.Frame.Size = UDim2.new(1, 0, 0, MenuFrame.Position.Y.Offset + MenuFrame.Size.Y.Offset);
+
+local RecordPage = nil
+Protect(function()
+	local Platform = UserInputService:GetPlatform();
+
+	if (Platform == Enum.Platform.Windows or Platform == Enum.Platform.OSX) then
+		RecordPage = MakePage("Record");
+		AddPage(RecordPage, "Record", "rbxasset://textures/ui/Settings/MenuBarIcons/RecordTab.png", 130);
+
+		local ScreenshotTitle = MakeText(RecordPage.Frame, "Screenshot", UDim2.new(1, 0, 0, 36), UDim2.new(0, 10, 0, 20));
+		ScreenshotTitle.TextSize = 36
+		ScreenshotTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+		local ScreenshotBody = MakeText(RecordPage.Frame, "By clicking the 'Take Screenshot' button, the menu will close and take a screenshot and save it to your computer.", UDim2.new(1, -20, 0, 70), UDim2.new(0, 10, 0, 64));
+		ScreenshotBody.Font = Enum.Font.SourceSans
+		ScreenshotBody.TextSize = 24
+		ScreenshotBody.TextXAlignment = Enum.TextXAlignment.Left
+		ScreenshotBody.TextYAlignment = Enum.TextYAlignment.Top
+
+		local ScreenshotButton = MakeStyledButton("ScreenshotButton", "Take Screenshot", UDim2.new(0, 300, 0, 44), function()
+			SetVisibility(false, true);
+			pcall(function()
+				if (keypress and keyrelease) then
+					keypress(KEY_PRINT_SCREEN);
+					keyrelease(KEY_PRINT_SCREEN);
+				else
+					StarterGui:SetCore("TakeScreenshot");
+				end
+			end)
+		end)
+		ScreenshotButton.Parent = RecordPage.Frame
+		ScreenshotButton.Position = UDim2.new(0, 410, 0, 120);
+
+		local VideoTitle = MakeText(RecordPage.Frame, "Video", UDim2.new(1, 0, 0, 36), UDim2.new(0, 10, 0, 215));
+		VideoTitle.TextSize = 36
+		VideoTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+		local VideoBody = MakeText(RecordPage.Frame, "By clicking the 'Record Video' button, the menu will close and start recording your screen.", UDim2.new(1, -20, 0, 70), UDim2.new(0, 10, 0, 259));
+		VideoBody.Font = Enum.Font.SourceSans
+		VideoBody.TextSize = 24
+		VideoBody.TextXAlignment = Enum.TextXAlignment.Left
+		VideoBody.TextYAlignment = Enum.TextYAlignment.Top
+
+		local StartSetting = 2
+		Protect(function()
+			if (GameSettings.VideoUploadPromptBehavior == Enum.UploadSetting.Never) then
+				StartSetting = 1
+			end
+		end)
+
+		MakeSelector(RecordPage, "Video Settings", ({ "Save To Disk", "Upload to YouTube" }), StartSetting, function(Index)
+			Protect(function()
+				GameSettings.VideoUploadPromptBehavior = (Index == 1 and Enum.UploadSetting.Never) or Enum.UploadSetting.Always;
+			end)
+		end)
+
+		local LastRow = RecordPage.Rows[#RecordPage.Rows];
+		if (LastRow) then
+			LastRow.Position = UDim2.new(0, 0, 0, 330);
+		end
+
+		local RecordButton = MakeStyledButton("RecordButton", "Record Video", UDim2.new(0, 300, 0, 44), function()
+			SetVisibility(false, true);
+			pcall(function()
+				if (keypress and keyrelease) then
+					keypress(KEY_F12);
+					keyrelease(KEY_F12);
+				else
+					StarterGui:SetCore("ToggleRecording");
+				end
+			end)
+		end)
+		RecordButton.Parent = RecordPage.Frame
+		RecordButton.Position = UDim2.new(0, 410, 0, 390);
+		RecordPage.Frame.Size = UDim2.new(1, 0, 0, 455);
+	end
+end)
 
 local ResetPage = MakePage("ResetCharacter");
 AddPage(ResetPage);

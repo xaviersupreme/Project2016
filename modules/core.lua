@@ -8,6 +8,7 @@ local CoreGui = game:GetService("CoreGui");
 local TextChatService = game:GetService("TextChatService");
 local Lighting = game:GetService("Lighting");
 local UserInputService = game:GetService("UserInputService");
+local GuiService = game:GetService("GuiService");
 local RunService = game:GetService("RunService");
 local StarterGui = game:GetService("StarterGui");
 local Players = game:GetService("Players");
@@ -1511,6 +1512,15 @@ if (Configuration.OldPlayerList) then
 			end
 		end
 
+		local onViewButtonPressed = function()
+			if (PlayerDropDown.Player) then
+				pcall(function()
+					GuiService:InspectPlayerFromUserId(GetUserId(PlayerDropDown.Player))
+				end)
+				PlayerDropDown:Hide()
+			end
+		end
+
 		local onFollowButtonPressed = function()
 			if (not PlayerDropDown.Player or not HttpRbxApiService) then
 				PlayerDropDown:Hide()
@@ -1664,6 +1674,12 @@ if (Configuration.OldPlayerList) then
 					OnPress = onDeclineFriendButonPressed,
 				})
 			end
+
+			Insert(Buttons, {
+				Name = "ViewButton",
+				Text = "View",
+				OnPress = onViewButtonPressed,
+			})
 
 			if (IsServerFollowers or IsFollowersEnabled) then
 				local Following = isFollowing(GetUserId(PlayerDropDown.Player), GetUserId(LocalPlayer))
