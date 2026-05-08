@@ -41,16 +41,16 @@ A 2016 CoreGui remake for Roblox
 
 ## Features
 
-- **2016 Topbar** -- Classic TopBar Icons
-- **Old Developer Console** -- Modded classic developer console
-- **Old Graphics** -- Classic Enum.Technology.Compatibility lighting
-- **Old Bubble Chat** -- Classic bubble chat style (if u even have chat lolx)
-- **Old Player List** -- Old UI Player list
-- **Old escape menu** -- Old escape menu
-- **Custom Topbar Icons** -- Game made topbar icons are automatically styled
-- **FPS Counter** -- Optional FPS display in the topbar
-- **Old Stud Textures** -- Old stud overlays on plastic parts
-- **Old Cursor** - Old arrow cursor
+- **2016 Topbar**
+- **Old Developer Console** 
+- **Old Graphics**
+- **Old Bubble Chat**
+- **Old Player List**
+- **Old escape menu**
+- **Custom Topbar Icons**
+- **FPS Counter**
+- **Old Stud Textures**
+- **Old Cursor** 
 
 ## Pictures
 
@@ -94,7 +94,6 @@ getgenv().Config2016 = getgenv().Config2016 or ({
 })
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/xaviersupreme/Project2016/main/modules/core.lua"))();
-
 ```
 
 ## Structure
