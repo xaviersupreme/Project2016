@@ -1513,7 +1513,7 @@ if (Configuration.OldPlayerList) then
 		end
 
 		local onReportButtonPressed = function()
-			if (PlayerDropDown.Player) then
+			if (PlayerDropDown.Player and PlayerDropDown.Player ~= LocalPlayer) then
 				local Env = getgenv()
 				if (Env.Settings2016 and Env.Settings2016.ReportPlayer) then
 					Env.Settings2016.ReportPlayer(Env.Settings2016, PlayerDropDown.Player)
@@ -1523,16 +1523,23 @@ if (Configuration.OldPlayerList) then
 		end
 
 		local onViewButtonPressed = function()
-			if (PlayerDropDown.Player) then
+			if (PlayerDropDown.Player and PlayerDropDown.Player ~= LocalPlayer) then
+				local SelectedPlayer = PlayerDropDown.Player
+				PlayerDropDown:Hide()
+				local Env = getgenv()
+				if (Env.Settings2016 and Env.Settings2016.SetVisibility) then
+					Env.Settings2016:SetVisibility(false, true)
+				end
 				pcall(function()
-					GuiService:InspectPlayerFromUserId(GetUserId(PlayerDropDown.Player))
+					GuiService:InspectPlayerFromUserId(GetUserId(SelectedPlayer))
 				end)
+			else
 				PlayerDropDown:Hide()
 			end
 		end
 
 		local onFollowButtonPressed = function()
-			if (not PlayerDropDown.Player or not HttpRbxApiService) then
+			if (not PlayerDropDown.Player or PlayerDropDown.Player == LocalPlayer or not HttpRbxApiService) then
 				PlayerDropDown:Hide()
 				return
 			end
@@ -1598,7 +1605,7 @@ if (Configuration.OldPlayerList) then
 		local createPopupFrame = function(Buttons)
 			local Frame = Create("Frame", {
 				Name = "PopupFrame",
-				Size = UDim2.new(1, 0, 0, (POPUP_ENTRY_SIZE_Y * #Buttons) + (#Buttons - ENTRY_PAD)),
+				Size = UDim2.new(1, 0, 0, math.max(0, (POPUP_ENTRY_SIZE_Y * #Buttons) + (#Buttons - ENTRY_PAD))),
 				Position = UDim2.new(1, 1, 0, 0),
 				BackgroundTransparency = 1,
 			})
@@ -1651,6 +1658,11 @@ if (Configuration.OldPlayerList) then
 		end
 
 		function PlayerDropDown:CreatePopup(Player)
+			if (Player == LocalPlayer or GetUserId(Player) <= 1 or GetUserId(LocalPlayer) <= 1) then
+				PlayerDropDown.Player = nil
+				return createPopupFrame({})
+			end
+
 			PlayerDropDown.Player = Player
 			local Buttons = {}
 			local Status = getFriendStatus(PlayerDropDown.Player)
