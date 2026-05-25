@@ -390,6 +390,11 @@ local SetupChat = function()
 		})
 	end
 
+	-- game:GetService("CoreGui").ExperienceChat.appLayout.channelBar
+	if (ExperienceChatApp:FindFirstChild("channelBar")) then
+		ExperienceChatApp:FindFirstChild("channelBar"):Destroy();
+	end	
+	
 	if (ChatWindowMain) then
 		Spawn(function()
 			local DotMenu = ChatWindowMain:WaitForChild("TopBanner", 10000):WaitForChild("DotMenu", 10000)
